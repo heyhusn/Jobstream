@@ -164,6 +164,8 @@ export function useReorderApplications() {
       const dirty = dirtyRows(next, previous);
       if (dirty.length === 0) return;
 
+      const before = new Map(previous.map((a) => [a.id, a]));
+
       const results = await Promise.all(
         dirty.map((a) => {
           const patch: {
@@ -172,10 +174,13 @@ export function useReorderApplications() {
             applied_at?: string;
           } = { stage: a.stage, stage_order: a.stage_order };
 
-          // Reaching "applied" without a date is almost always a
-          // drag, not a deliberate blank — stamp it once, and
-          // never overwrite a date the person set themselves.
-          if (a.stage === "applied" && !a.applied_at) {
+          // Stamp the date only when this drag is what moved the
+          // card into Applied. Inserting a card renumbers the whole
+          // column, so every other card in it is "dirty" too — and
+          // stamping those re-fills a date the person deliberately
+          // cleared, with today's.
+          const wasStage = before.get(a.id)?.stage;
+          if (a.stage === "applied" && wasStage !== "applied" && !a.applied_at) {
             patch.applied_at = new Date().toISOString();
           }
 
@@ -186,8 +191,26 @@ export function useReorderApplications() {
       const failed = results.find((r) => r.error);
       if (failed?.error) throw failed.error;
     },
+    onMutate: async () => {
+      // The optimistic write happens at the call site, but the
+      // in-flight refetches still have to be stopped: any query that
+      // resolves mid-drag overwrites the board with stale rows and
+      // the card visibly jumps back for the length of the save.
+      await qc.cancelQueries({ queryKey: applicationsKey(user?.id) });
+    },
     onError: (_err, vars) => {
-      qc.setQueryData(applicationsKey(user?.id), vars.previous);
+      // Restore positions without resurrecting rows. `previous` is a
+      // snapshot from drag-start, so writing it back wholesale undoes
+      // anything else that happened in between — most visibly, a card
+      // the person deleted mid-save reappears on the board after
+      // they were told it was gone.
+      const positions = new Map(vars.previous.map((a) => [a.id, a]));
+      qc.setQueryData<ApplicationItem[]>(applicationsKey(user?.id), (current) =>
+        (current ?? []).map((a) => {
+          const was = positions.get(a.id);
+          return was ? { ...a, stage: was.stage, stage_order: was.stage_order } : a;
+        })
+      );
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: applicationsKey(user?.id) });
@@ -322,7 +345,13 @@ export function useSaveToTracker() {
         stage: "saved",
         stage_order: (top?.stage_order ?? 0) - 1,
       });
-      if (error) throw error;
+
+      // The check above is a read, so another tab — or a retry whose
+      // first request actually landed — can insert between it and
+      // here. `unique (user_id, job_id)` catches that, and the row
+      // being there is exactly what was wanted: reporting it as a
+      // failure shows "Saved to tracker" and an error banner at once.
+      if (error && error.code !== "23505") throw error;
     },
     onMutate: async (jobId) => {
       const key = ["tracked-job-ids", user?.id];

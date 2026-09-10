@@ -29,6 +29,22 @@ export function relativeDays(iso: string | null, now: number): string | null {
   return `${Math.abs(days)} days ago`;
 }
 
+/**
+ * Whether a next-action date has actually passed.
+ *
+ * Deliberately not `new Date(iso) < now`: dates picked in the UI are
+ * anchored at local noon, so a plain timestamp comparison starts
+ * calling a card "Overdue today" from 12:00 on the day it's due.
+ * A day-granular field deserves a day-granular test.
+ */
+export function isOverdue(iso: string | null, now: number): boolean {
+  if (!iso) return false;
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return false;
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return startOf(then) < startOf(new Date(now));
+}
+
 /** `YYYY-MM-DD` for <input type="date">, from a timestamptz. */
 export function toDateInput(iso: string | null): string {
   if (!iso) return "";

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useApplications, useMatchScores } from "@/hooks/useApplications";
 import { useNow } from "@/hooks/useNow";
+import { isOverdue } from "@/lib/format";
 import { TrackerBoard } from "@/components/tracker/TrackerBoard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -19,11 +20,7 @@ export function TrackerPage() {
       interviewing: all.filter((a) => a.stage === "interviewing").length,
       offers: all.filter((a) => a.stage === "offer").length,
       overdue: all.filter(
-        (a) =>
-          a.next_action_at != null &&
-          new Date(a.next_action_at).getTime() < now &&
-          a.stage !== "rejected" &&
-          a.stage !== "withdrawn"
+        (a) => isOverdue(a.next_action_at, now) && a.stage !== "rejected" && a.stage !== "withdrawn"
       ).length,
     };
   }, [applications, now]);

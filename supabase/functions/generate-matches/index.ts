@@ -3,13 +3,41 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-task-secret',
 };
+
+// Shared secret, required. These functions hold a service-role
+// client, so a caller who can shape the request body is acting as
+// whichever user they name. Set TASK_DISPATCH_SECRET as a function
+// secret and seed the same value into private.app_config — see
+// supabase/migrations/0005_cover_letters.sql.
+function checkSecret(req: Request): Response | null {
+  const expected = Deno.env.get('TASK_DISPATCH_SECRET');
+  if (!expected) {
+    console.error('TASK_DISPATCH_SECRET is not set; refusing every request.');
+    return new Response(JSON.stringify({ error: 'This function is not configured.' }),
+      { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  const got = req.headers.get('x-task-secret') ?? '';
+  const enc = new TextEncoder();
+  const a = enc.encode(got), b = enc.encode(expected);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  if (diff !== 0) {
+    return new Response(JSON.stringify({ error: 'Not authorised.' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+  return null;
+}
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  const denied = checkSecret(req);
+  if (denied) return denied;
 
   let taskId = null;
   let supabase = null;
@@ -23,12 +51,25 @@ serve(async (req) => {
     }
 
     taskId = record.id;
-    const userId = record.user_id;
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://wtkmrkhaokrcxvkrfyop.supabase.co';
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || 'sb_publishable_gQprN2Jov1dCxyaVJlJufQ_XcxMaVVM';
-    supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || supabaseKey);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set in this function\'s environment.');
+    }
+    supabase = createClient(supabaseUrl, serviceKey);
+
+    // Re-read the task rather than trusting the request body: the
+    // posted `user_id` used to be taken at face value, so anyone who
+    // could reach this URL could act as any user through the
+    // service-role client below.
+    const { data: taskRow } = await supabase
+      .from('tasks').select('id, user_id, task_type, status').eq('id', taskId).single();
+    if (!taskRow || taskRow.task_type !== 'generate_matches') {
+      return new Response(JSON.stringify({ error: 'No such task.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const userId = taskRow.user_id;
 
     // Update task to running
     await supabase.from('tasks').update({ status: 'running' }).eq('id', taskId);
@@ -161,9 +202,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error(error);
+    const message = error instanceof Error ? error.message : String(error);
     if (taskId && supabase) {
-      await supabase.from('tasks').update({ status: 'failed', error: error.message }).eq('id', taskId);
+      await supabase.from('tasks').update({ status: 'failed', error: message }).eq('id', taskId);
     }
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

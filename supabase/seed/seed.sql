@@ -48,21 +48,10 @@ join (values
   on c.canonical_name = j.company_name
 on conflict (fingerprint) do nothing;
 
--- Ghost signals for the seeded jobs
-insert into public.ghost_signals
-  (job_id, days_open, repost_count, salary_disclosed, on_company_site, company_fill_rate, risk_score, risk_band, reasons)
-select
-  jb.id,
-  extract(day from now() - jb.first_seen_at)::int,
-  jb.repost_count,
-  jb.salary_min is not null,
-  jb.source <> 'aggregator',
-  case when jb.source = 'aggregator' then 0.06 else 0.85 end,
-  case when jb.source = 'aggregator' then 88 else 8 end,
-  case when jb.source = 'aggregator' then 'high' else 'low' end,
-  case when jb.source = 'aggregator'
-    then '["First appeared 214 days ago","Relisted 6 times","Not on the company\u2019s own careers page","Salary not disclosed"]'::jsonb
-    else '["Recently posted","Never relisted","Listed on the company\u2019s own careers page","Salary disclosed"]'::jsonb
-  end
-from public.jobs jb
-on conflict (job_id) do nothing;
+-- Ghost signals are no longer seeded by hand: migration 0007 adds a
+-- trigger that computes them from the job row itself the moment
+-- it's inserted (days open, repost count, salary disclosure,
+-- first-party vs. aggregator source). Re-running
+-- `select public.recompute_all_ghost_signals();` after this file
+-- refreshes them if you re-seed on a later day and want days_open
+-- to reflect it.

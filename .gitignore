@@ -31,3 +31,6 @@ check-tasks.js
 invoke-ef.js
 test-matches.js
 sample_resume.txt
+
+# Supabase CLI local link cache (project ref, pooler URL, version stamps)
+supabase/.temp/

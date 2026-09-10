@@ -7,8 +7,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCreditBalance } from "@/hooks/useCreditBalance";
 import {
   coverLetterKey,
+  draftKey,
   useCoverLetter,
   useDeleteCoverLetter,
+  useInFlightCoverLetterTask,
   useUpdateCoverLetter,
   type CoverLetterTaskResult,
 } from "@/hooks/useCoverLetter";
@@ -45,30 +47,55 @@ export function CoverLetterPanel({ item }: Props) {
   const update = useUpdateCoverLetter(jobId);
   const remove = useDeleteCoverLetter(jobId);
 
-  const { state: task, run, reset } = useAsyncTask<Record<string, unknown>, CoverLetterTaskResult>(
-    "cover_letter"
-  );
+  const { state: task, run, watch, reset } = useAsyncTask<
+    Record<string, unknown>,
+    CoverLetterTaskResult
+  >("cover_letter");
+
+  const { data: inFlightTaskId } = useInFlightCoverLetterTask(jobId);
 
   const [tone, setTone] = useState<CoverLetterTone>("professional");
   const [notes, setNotes] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [confirmingRegenerate, setConfirmingRegenerate] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [copied, setCopied] = useState(false);
+  const adoptedRef = useRef<string | null>(null);
+
+  // A generation started before the drawer was closed is still
+  // running server-side. Pick it back up rather than offering a
+  // button that would spend a second credit on the same letter.
+  useEffect(() => {
+    if (!inFlightTaskId || adoptedRef.current === inFlightTaskId) return;
+    if (task.phase !== "idle") return;
+    adoptedRef.current = inFlightTaskId;
+    watch(inFlightTaskId);
+  }, [inFlightTaskId, task.phase, watch]);
 
   // The function wrote the row; pull it in, and re-read the balance
   // in case the realtime update on credit_balances didn't land.
   useEffect(() => {
     if (task.phase !== "done") return;
+    adoptedRef.current = null;
     qc.invalidateQueries({ queryKey: coverLetterKey(user?.id, jobId) });
     qc.invalidateQueries({ queryKey: ["credit-balance", user?.id] });
-  }, [task.phase, qc, user?.id, jobId]);
+    qc.invalidateQueries({ queryKey: ["cover-letter-task", user?.id, jobId] });
+    // A stale "that edit didn't save" from before the regenerate
+    // would otherwise sit under a draft it has nothing to do with.
+    update.reset();
+  }, [task.phase, qc, user?.id, jobId, update]);
 
   const busy = task.phase === "queued" || task.phase === "running";
-  const outOfCredits = credits != null && credits.credits_remaining < 1;
+  // Unknown is not "yes". Treating a loading or failed balance as
+  // "has credits" let a spent-out user click through to a server-side
+  // rejection, and left the button live forever if the query errored.
+  const outOfCredits = credits == null || credits.credits_remaining < 1;
   const placeholders = task.phase === "done" ? (task.result?.placeholders ?? []) : [];
 
   function generate() {
     setConfirmingRegenerate(false);
+    setConfirmingDiscard(false);
+    update.reset();
     reset();
     run({
       job_id: jobId,
@@ -83,7 +110,7 @@ export function CoverLetterPanel({ item }: Props) {
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-semibold">Cover letter</h3>
         {letter && (
-          <p className="text-[11px] text-ink-45">
+          <p className="text-[11px] text-ink-70">
             {letter.model}
             {letter.edited ? " · edited by you" : ""}
           </p>
@@ -99,14 +126,20 @@ export function CoverLetterPanel({ item }: Props) {
       )}
 
       {task.phase === "failed" && (
-        <TaskState phase="failed" errorMessage={task.error} onRetry={generate} />
+        <div className="mb-3">
+          <TaskState phase="failed" errorMessage={task.error} onRetry={generate} />
+        </div>
       )}
 
-      {!busy && task.phase !== "failed" && (
+      {/* A failed regenerate is not a reason to take away the draft
+          that is still sitting in the database — the person can no
+          longer even copy it, and the only listed way out is another
+          credit. The error shows above; the letter stays. */}
+      {!busy && (
         <>
           {isPending && <div className="h-24 animate-pulse rounded-app bg-raised" />}
 
-          {!isPending && !letter && (
+          {!isPending && !letter && task.phase !== "failed" && (
             <Composer
               tone={tone}
               setTone={setTone}
@@ -122,7 +155,7 @@ export function CoverLetterPanel({ item }: Props) {
 
           {!isPending && letter && (
             <LetterEditor
-              key={letter.id}
+              key={draftKey(letter)}
               letterId={letter.id}
               initialSubject={letter.subject}
               initialBody={letter.body}
@@ -137,7 +170,13 @@ export function CoverLetterPanel({ item }: Props) {
               onRegenerate={() => (letter.edited ? setConfirmingRegenerate(true) : generate())}
               onConfirmRegenerate={generate}
               onCancelRegenerate={() => setConfirmingRegenerate(false)}
-              onDelete={() => remove.mutate(letter.id)}
+              confirmingDiscard={confirmingDiscard}
+              onDiscard={() => setConfirmingDiscard(true)}
+              onConfirmDiscard={() => {
+                setConfirmingDiscard(false);
+                remove.mutate(letter.id);
+              }}
+              onCancelDiscard={() => setConfirmingDiscard(false)}
               jobTitle={item.job.title}
               company={item.job.company?.canonical_name ?? null}
             />
@@ -180,7 +219,7 @@ function Composer({
         type="button"
         onClick={() => setShowOptions(!showOptions)}
         aria-expanded={showOptions}
-        className="mt-3 text-xs font-medium text-ink-45 underline hover:text-ink"
+        className="mt-3 text-xs font-medium text-ink-70 underline hover:text-ink"
       >
         {showOptions ? "Hide options" : "Tone and notes"}
       </button>
@@ -208,7 +247,7 @@ function Composer({
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-[11px] text-ink-45">
+            <p className="mt-1.5 text-[11px] text-ink-70">
               {TONES.find((t) => t.id === tone)?.hint}
             </p>
           </fieldset>
@@ -237,7 +276,7 @@ function Composer({
         >
           {label}
         </button>
-        <span className="text-xs text-ink-45">1 credit</span>
+        <span className="text-xs text-ink-70">1 credit</span>
         {outOfCredits && (
           <Link to="/settings/billing" className="text-xs text-ghost underline">
             You're out of credits
@@ -263,7 +302,10 @@ function LetterEditor({
   onRegenerate,
   onConfirmRegenerate,
   onCancelRegenerate,
-  onDelete,
+  confirmingDiscard,
+  onDiscard,
+  onConfirmDiscard,
+  onCancelDiscard,
   jobTitle,
   company,
 }: {
@@ -281,7 +323,10 @@ function LetterEditor({
   onRegenerate: () => void;
   onConfirmRegenerate: () => void;
   onCancelRegenerate: () => void;
-  onDelete: () => void;
+  confirmingDiscard: boolean;
+  onDiscard: () => void;
+  onConfirmDiscard: () => void;
+  onCancelDiscard: () => void;
   jobTitle: string;
   company: string | null;
 }) {
@@ -290,10 +335,47 @@ function LetterEditor({
   const [subject, setSubject] = useState(initialSubject ?? "");
   const [body, setBody] = useState(initialBody);
   const timer = useRef<number | null>(null);
+  // The last text this editor put on the wire, so an echo of our own
+  // save isn't mistaken for a new draft arriving.
+  const sent = useRef<{ subject: string | null; body: string } | null>(null);
 
+  // Adopt a draft that arrived from the server.
+  //
+  // Regeneration upserts on `unique (user_id, job_id)`, so the row id
+  // does not change and remounting on it never happens: without this
+  // the editor keeps showing the previous draft after a regenerate,
+  // and the next keystroke saves that stale text back over the new
+  // one. Local edits still win — a pending save or text we just sent
+  // is never overwritten by its own round trip.
+  useEffect(() => {
+    if (timer.current) return;
+    if (sent.current?.body === initialBody && sent.current?.subject === (initialSubject ?? null)) {
+      return;
+    }
+    setBody((current) => (current === initialBody ? current : initialBody));
+    setSubject((current) => (current === (initialSubject ?? "") ? current : initialSubject ?? ""));
+  }, [initialBody, initialSubject]);
+
+  // Kept fresh so the unmount flush writes what is on screen now.
+  // Assigned in an effect, not during render — a ref written while
+  // rendering is unsafe under concurrent rendering.
+  const latest = useRef({ subject, body, onSave });
+  useEffect(() => {
+    latest.current = { subject, body, onSave };
+  });
+
+  // Closing the drawer, or pressing Escape, unmounts this while a
+  // save may still be debounced. Escape never blurs the textarea, so
+  // onBlur doesn't cover it — clearing the timer alone would eat the
+  // last second of typing under a label reading "saves as you type".
   useEffect(() => {
     return () => {
-      if (timer.current) window.clearTimeout(timer.current);
+      if (!timer.current) return;
+      window.clearTimeout(timer.current);
+      timer.current = null;
+      const { subject: sub, body: bod, onSave: save } = latest.current;
+      sent.current = { subject: sub.trim() || null, body: bod };
+      save(sub.trim() || null, bod);
     };
   }, []);
 
@@ -301,6 +383,7 @@ function LetterEditor({
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       timer.current = null;
+      sent.current = { subject: nextSubject.trim() || null, body: nextBody };
       onSave(nextSubject.trim() || null, nextBody);
     }, SAVE_DEBOUNCE_MS);
   }
@@ -309,6 +392,7 @@ function LetterEditor({
     if (!timer.current) return;
     window.clearTimeout(timer.current);
     timer.current = null;
+    sent.current = { subject: subject.trim() || null, body };
     onSave(subject.trim() || null, body);
   }
 
@@ -371,7 +455,7 @@ function LetterEditor({
 
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-ink-70">
-          Letter <span className="font-normal text-ink-45">— saves as you type</span>
+          Letter <span className="font-normal text-ink-70">— saves as you type</span>
         </span>
         <textarea
           id={`letter-body-${letterId}`}
@@ -417,15 +501,46 @@ function LetterEditor({
         </button>
         <button
           type="button"
-          onClick={onDelete}
-          className="ml-auto text-xs text-ink-45 transition-colors hover:text-ghost"
+          onClick={onDiscard}
+          className="ml-auto rounded-app px-2 py-1.5 text-sm text-ink-70 transition-colors hover:text-ghost"
         >
           Discard
         </button>
       </div>
 
+      {confirmingDiscard && (
+        <div role="alertdialog" aria-label="Discard this letter?" className="rounded-app border border-ghost/40 bg-ghost-wash px-3 py-2.5">
+          <p className="text-xs leading-relaxed text-ink-70">
+            Discard this letter? Your edits go with it, and writing another costs a credit.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              // Focused on mount so the confirmation isn't silently
+              // inserted below a screen reader user's cursor.
+              ref={(el) => el?.focus()}
+              onClick={onCancelDiscard}
+              className="rounded-app border-[1.5px] border-ink px-3 py-1 text-xs font-semibold"
+            >
+              Keep it
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmDiscard}
+              className="rounded-app border border-ghost bg-ghost px-3 py-1 text-xs font-semibold text-paper hover:opacity-90"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {confirming && (
-        <div className="rounded-app border border-rule bg-raised px-3 py-2.5">
+        <div
+          role="alertdialog"
+          aria-label="Replace this letter?"
+          className="rounded-app border border-rule bg-raised px-3 py-2.5"
+        >
           <p className="text-xs leading-relaxed text-ink-70">
             {edited
               ? "You've edited this letter. Regenerating replaces it with a new draft and costs another credit."
@@ -434,6 +549,9 @@ function LetterEditor({
           <div className="mt-2 flex gap-2">
             <button
               type="button"
+              // Focus follows the confirmation, so a keyboard or
+              // screen-reader user knows it appeared at all.
+              ref={(el) => el?.focus()}
               onClick={onConfirmRegenerate}
               className="rounded-app border-[1.5px] border-ink bg-ink px-3 py-1 text-xs font-semibold text-paper"
             >

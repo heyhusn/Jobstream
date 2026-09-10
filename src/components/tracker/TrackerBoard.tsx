@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
   type Announcements,
+  type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
@@ -37,6 +40,27 @@ interface Props {
   scores: Record<string, number>;
 }
 
+interface PendingPosition {
+  stage: ApplicationStage;
+  stage_order: number;
+}
+
+/**
+ * `closestCorners` alone never reports "nothing" — it always names
+ * the nearest column, however far outside the board the pointer is.
+ * That turns letting go in empty space into a silent move to
+ * whichever column happened to be closest. Requiring an actual
+ * overlap first gives the drag a way to end in nothing, which is
+ * what a release over open space should mean; inside the board,
+ * closestCorners still does the fine-grained work.
+ */
+const collisionDetection: CollisionDetection = (args) => {
+  const pointer = pointerWithin(args);
+  if (pointer.length > 0) return pointer;
+  if (rectIntersection(args).length === 0) return [];
+  return closestCorners(args);
+};
+
 function findStage(board: Board, id: UniqueIdentifier | null): ApplicationStage | null {
   if (id == null) return null;
   const key = String(id);
@@ -50,7 +74,40 @@ export function TrackerBoard({ applications, scores }: Props) {
   const reorder = useReorderApplications();
   const now = useNow();
 
-  const serverBoard = useMemo(() => groupByStage(applications), [applications]);
+  // Positions a finished drag is still saving, by application id.
+  //
+  // The optimistic cache write isn't enough on its own: any other
+  // mutation that invalidates this query — deleting a different card,
+  // editing a note — refetches and overwrites the drag with rows the
+  // server hasn't been told about yet, so the card visibly jumps back
+  // for as long as the save takes and then jumps forward again.
+  //
+  // Positions rather than a frozen board, deliberately: which rows
+  // exist still comes from the query, so a card deleted during the
+  // save disappears immediately instead of hanging around until the
+  // drag finishes writing.
+  const [pending, setPending] = useState<Map<string, PendingPosition> | null>(null);
+  const isFetching = useIsFetching({ queryKey: applicationsKey(user?.id) });
+
+  // Applied only while the write is genuinely in flight — the
+  // mutation running, or its invalidation still refetching. Once
+  // both are quiet the query holds the truth, and re-applying these
+  // positions would be a no-op anyway since the write succeeded.
+  const settling = reorder.isPending || isFetching > 0;
+  const positions = settling ? pending : null;
+
+  const serverBoard = useMemo(
+    () =>
+      groupByStage(
+        positions
+          ? applications.map((a) => {
+              const at = positions.get(a.id);
+              return at ? { ...a, stage: at.stage, stage_order: at.stage_order } : a;
+            })
+          : applications
+      ),
+    [applications, positions]
+  );
 
   // While a card is in flight the board is driven by local state,
   // so cross-column previews are instant and don't wait on a round
@@ -91,6 +148,7 @@ export function TrackerBoard({ applications, scores }: Props) {
   };
 
   function handleDragStart(event: DragStartEvent) {
+    setPending(null);
     setActiveId(String(event.active.id));
     setDragBoard(serverBoard);
   }
@@ -127,12 +185,21 @@ export function TrackerBoard({ applications, scores }: Props) {
     const { active, over } = event;
     const current = dragBoard ?? serverBoard;
 
+    // Released over nothing — below the board, off the side. The
+    // cross-column preview has already moved the card in dragBoard,
+    // so committing here would silently drop it wherever the
+    // pointer last passed. Letting go in empty space means cancel.
+    if (!over) {
+      handleDragCancel();
+      return;
+    }
+
     let next = current;
     const from = findStage(current, active.id);
-    const to = over ? findStage(current, over.id) : null;
+    const to = findStage(current, over.id);
 
     if (from && to && from === to) {
-      const overKey = String(over!.id);
+      const overKey = String(over.id);
       next = reorderWithin(current, from, String(active.id), isStageId(overKey) ? null : overKey);
     }
 
@@ -144,10 +211,16 @@ export function TrackerBoard({ applications, scores }: Props) {
     const previous = applications;
 
     qc.setQueryData(applicationsKey(user?.id), committed);
+    setPending(new Map(committed.map((a) => [a.id, { stage: a.stage, stage_order: a.stage_order }])));
     setDragBoard(null);
     setActiveId(null);
 
-    reorder.mutate({ next: committed, previous });
+    reorder.mutate(
+      { next: committed, previous },
+      // A failed save rolls the cache back; stop showing the
+      // arrangement that didn't happen.
+      { onError: () => setPending(null) }
+    );
   }
 
   function handleDragCancel() {
@@ -169,7 +242,7 @@ export function TrackerBoard({ applications, scores }: Props) {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
         accessibility={{
           announcements,
           screenReaderInstructions: {

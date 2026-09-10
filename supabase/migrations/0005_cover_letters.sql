@@ -65,10 +65,13 @@ alter table public.cover_letters enable row level security;
 -- Read, edit and delete your own. Deliberately no insert policy:
 -- rows are written only by the Edge Function under the service
 -- role, so a letter's provenance always reflects a real generation.
+drop policy if exists "read own cover letters" on public.cover_letters;
 create policy "read own cover letters" on public.cover_letters
   for select using (auth.uid() = user_id);
+drop policy if exists "edit own cover letters" on public.cover_letters;
 create policy "edit own cover letters" on public.cover_letters
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "delete own cover letters" on public.cover_letters;
 create policy "delete own cover letters" on public.cover_letters
   for delete using (auth.uid() = user_id);
 
@@ -82,13 +85,31 @@ returns trigger
 language plpgsql
 as $$
 begin
-  new.id           := old.id;
-  new.user_id      := old.user_id;
-  new.job_id       := old.job_id;
-  new.model        := old.model;
+  -- Regeneration arrives as the UPDATE leg of the Edge Function's
+  -- upsert, under the service role. Pinning provenance there would
+  -- freeze `model` and `generated_at` at the first draft's values
+  -- and mark every fresh draft "edited by you" — the exact opposite
+  -- of what this trigger exists to guarantee. Only client writes
+  -- are constrained.
+  if current_setting('role', true) = 'service_role'
+     or (select rolbypassrls from pg_roles where rolname = current_user) then
+    new.updated_at := now();
+    return new;
+  end if;
+
+  new.id             := old.id;
+  new.user_id        := old.user_id;
+  new.job_id         := old.job_id;
+  new.model          := old.model;
   new.prompt_version := old.prompt_version;
-  new.generated_at := old.generated_at;
-  new.updated_at   := now();
+  new.generated_at   := old.generated_at;
+  new.tone           := old.tone;
+  new.notes          := old.notes;
+  -- An application_id the client picks is unchecked against RLS
+  -- (foreign keys don't consult policies), so a client could point
+  -- its letter at someone else's application row.
+  new.application_id := old.application_id;
+  new.updated_at     := now();
 
   -- `edited` is a fact about the text, not a flag the client sets.
   if new.body is distinct from old.body or new.subject is distinct from old.subject then
@@ -140,6 +161,13 @@ declare
   v_remaining numeric;
   v_reset    timestamptz;
 begin
+  -- Without this, a negative amount passes the `v_remaining <
+  -- p_credits` test and then *adds* to the balance, and zero buys a
+  -- free generation. No caller should ever send either.
+  if p_credits is null or p_credits <= 0 then
+    raise exception 'consume_credit: p_credits must be a positive number, got %', p_credits;
+  end if;
+
   select * into v_row
     from public.credit_balances
    where user_id = p_user_id
@@ -185,23 +213,52 @@ $$;
   negative usage_event rather than a deletion, so the ledger still
   shows what was attempted.
 */
-create or replace function public.refund_credit(
+drop function if exists public.refund_credit(uuid, text, numeric);
+create function public.refund_credit(
   p_user_id uuid,
   p_feature text,
   p_credits numeric default 1
 )
-returns void
+returns boolean
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_updated int;
 begin
+  if p_credits is null or p_credits <= 0 then
+    raise exception 'refund_credit: p_credits must be a positive number, got %', p_credits;
+  end if;
+
+  -- A refund is a reversal, never a top-up: it cannot exceed what
+  -- this feature actually charged this period.
+  if p_credits > coalesce((
+        select sum(credits_charged)
+          from public.usage_events
+         where user_id = p_user_id
+           and feature in (p_feature, p_feature || '_refund')
+           and created_at >= date_trunc('month', now())
+      ), 0) then
+    raise exception 'refund_credit: refund of % exceeds charges for %', p_credits, p_feature;
+  end if;
+
   update public.credit_balances
      set credits_remaining = credits_remaining + p_credits
    where user_id = p_user_id;
 
+  get diagnostics v_updated = row_count;
+  -- No balance row means no refund happened. Saying so lets the
+  -- caller report a stranded credit instead of logging a ledger
+  -- entry for money that never moved.
+  if v_updated = 0 then
+    return false;
+  end if;
+
   insert into public.usage_events (user_id, feature, credits_charged)
   values (p_user_id, p_feature || '_refund', -p_credits);
+
+  return true;
 end;
 $$;
 
@@ -267,14 +324,23 @@ begin
     v_headers := v_headers || jsonb_build_object('x-task-secret', v_secret);
   end if;
 
-  perform net.http_post(
-    url     := v_base || v_path,
-    headers := v_headers,
-    -- The id is the only field the newer functions trust; they
-    -- re-read the row themselves. The rest is kept so the existing
-    -- parse-resume and generate-matches functions still work.
-    body    := jsonb_build_object('record', row_to_json(new))
-  );
+  -- handle_new_task is an AFTER INSERT trigger, so an exception in
+  -- here aborts the statement: a missing pg_net, a malformed
+  -- functions_url, or an unseeded app_config would stop the user
+  -- creating ANY task of any type. A dispatch that can't leave is a
+  -- task that sits visibly queued, which is the honest failure.
+  begin
+    perform net.http_post(
+      url     := v_base || v_path,
+      headers := v_headers,
+      -- The id is the only field the newer functions trust; they
+      -- re-read the row themselves. The rest is kept so the existing
+      -- parse-resume and generate-matches functions still work.
+      body    := jsonb_build_object('record', row_to_json(new))
+    );
+  exception when others then
+    raise warning 'handle_new_task: dispatch to % failed: %', v_path, sqlerrm;
+  end;
 
   return new;
 end;

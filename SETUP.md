@@ -34,6 +34,8 @@ bucket, the heuristic parse/match functions — is in
 - `0004_real_matching.sql` — embeddings + Edge Function dispatch
 - `0005_cover_letters.sql` — cover letters, credit charging, and a
   locked-down dispatch config (see "Cover letters" below)
+- `0006_lock_down_legacy_functions.sql` — revokes EXECUTE on the
+  0003 helpers from `anon`/`authenticated` (see below)
 
 **Easiest path:** open the Supabase SQL Editor and paste each file
 in, in order.
@@ -138,23 +140,33 @@ writes a row to `cover_letters` → the client sees the task go
 
 ### Deploying it
 
-```bash
-# 1. Secrets. The function reads these from the environment and has
-#    no literal fallback — it fails loudly rather than running on a
-#    key committed to the repo.
-npx supabase secrets set DEEPSEEK_API_KEY=sk-...
-npx supabase secrets set TASK_DISPATCH_SECRET="$(openssl rand -hex 32)"
+**All three steps are required.** The functions read every secret
+from the environment with no literal fallback, and refuse to run
+without them — an unconfigured deploy fails loudly instead of
+running on a committed key or an open endpoint.
 
-# 2. The function itself.
+```bash
+SECRET="$(openssl rand -hex 32)"
+
+# 1. Secrets. DEEPSEEK_API_KEY is used by parse-resume and
+#    generate-cover-letter; TASK_DISPATCH_SECRET by all three.
+npx supabase secrets set DEEPSEEK_API_KEY=sk-...
+npx supabase secrets set TASK_DISPATCH_SECRET="$SECRET"
+
+# 2. The functions. Redeploy all three: parse-resume and
+#    generate-matches now require the dispatch secret too.
 npx supabase functions deploy generate-cover-letter
+npx supabase functions deploy parse-resume
+npx supabase functions deploy generate-matches
 
 # 3. Tell the dispatcher where the functions live and what secret to
-#    send. Same value as TASK_DISPATCH_SECRET above.
+#    send. The same value as TASK_DISPATCH_SECRET above — if these
+#    two disagree, every task 401s and sits queued forever.
 psql "$DATABASE_URL" -c "
   insert into private.app_config (key, value) values
     ('functions_url', 'https://<project-ref>.supabase.co/functions/v1/'),
     ('anon_key', '<your anon key>'),
-    ('task_dispatch_secret', '<the same random hex>')
+    ('task_dispatch_secret', '$SECRET')
   on conflict (key) do update set value = excluded.value, updated_at = now();"
 ```
 
@@ -166,18 +178,31 @@ take the user id straight from the request body, so anyone who
 finds the function URL can POST `{"record":{"user_id":"<anyone>"}}`
 and act as that person. That's a live hole in those two.
 
-`generate-cover-letter` closes it two ways: it takes only the task
-**id** from the request and re-reads everything else from the
-database, and it rejects any request without a matching
-`x-task-secret` header. The header check is skipped when
-`TASK_DISPATCH_SECRET` is unset, so an unconfigured project still
-runs — set it. **The same fix should be ported to the other two
-functions**, along with rotating the DeepSeek key that is currently
-hardcoded in `parse-resume/index.ts`.
+All three functions now close it the same two ways: they take only
+the task **id** from the request and re-read `user_id` and
+`task_type` from the row, and they reject any request whose
+`x-task-secret` header doesn't match (compared in constant time).
+An unset `TASK_DISPATCH_SECRET` returns 503 to everyone rather than
+waving callers through — it fails closed, which is why step 1 above
+is not optional.
+
+The DeepSeek key that used to sit in `parse-resume/index.ts` is
+gone from the source, but **it was committed, so rotate it** at
+platform.deepseek.com before setting the secret above.
+
+`0006_lock_down_legacy_functions.sql` closes a third hole in the
+same area: `do_parse_resume` and `do_generate_matches` from 0003
+are `security definer`, and Postgres grants EXECUTE on new
+functions to PUBLIC, so any signed-in user who learned another
+user's task UUID could call them and rewrite that task row —
+straight past 0001's deliberate "no update policy on tasks". That
+was verified as a working exploit before the migration was written.
 
 ### Credits
 
-`consume_credit()` locks the balance row, folds in the monthly
+`consume_credit()` rejects a non-positive amount outright (a
+negative one used to pass the "can you afford it" test and then add
+to the balance), locks the balance row, folds in the monthly
 reset, decrements, and writes a `usage_events` row — all in one
 transaction, so two tabs can't both spend the last credit. The
 function charges *before* calling the model and refunds on any
@@ -185,9 +210,25 @@ failure (logged as a negative usage event, not a deletion), because
 charging on success lets someone run the model for free by hanging
 up before the write.
 
-Neither `consume_credit` nor `refund_credit` is callable by
-`anon` or `authenticated` — a client that could call the refund
-would have infinite credits.
+`refund_credit()` is a reversal, not a top-up: it refuses to return
+more than the feature actually charged this month, and returns
+false rather than lying when there is no balance row to credit. If
+a refund doesn't land, the task says so — "a credit was charged and
+could not be returned automatically" — instead of the old message,
+which claimed you hadn't been charged while the credit was gone.
+
+Neither function is callable by `anon` or `authenticated` — a client
+that could call the refund would have infinite credits.
+
+### Delivery is at-least-once, so the function is idempotent
+
+pg_net retries, and two deliveries of the same webhook overlap
+routinely. The function claims its task with a conditional
+`update ... where status = 'queued'` and proceeds only if that
+matched a row, so a duplicate delivery costs nothing. Reading the
+status and then trusting it — which is what it did first — let both
+deliveries through: two credits, two model calls, and the second
+letter overwriting the first.
 
 ### What the letter will and won't say
 
@@ -200,6 +241,28 @@ Manager]`) are surfaced as a warning above the letter instead of
 being silently shipped.
 
 None of that makes it safe to send unread, and the UI says so.
+
+### Checking the letters are actually good
+
+The function's own test suite stubs the model, which proves the
+plumbing and says nothing about the prose. `bench.ts` calls the live
+API with the same `buildMessages`/`parseLetter` the function uses:
+
+```bash
+export DEEPSEEK_API_KEY=sk-...
+deno run --allow-net --allow-env \
+  supabase/functions/generate-cover-letter/bench.ts
+```
+
+Four cases — the three tones, plus a job description that tries to
+talk to the model instead of describing a job (a second
+`## The candidate` block with a fabricated Google/Stanford resume).
+It prints each letter and checks length, placeholders, clichéd
+openings, markdown leakage, whether anything unsupported by the
+resume appeared, and whether the letter names real projects from it.
+
+Swap the `RESUME` constant for your own text. Read the letters — the
+checks catch the mechanical failures, not the flat ones.
 
 ## A production note before you charge anyone
 

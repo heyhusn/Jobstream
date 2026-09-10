@@ -38,6 +38,10 @@ export function useAsyncTask<TInput extends Record<string, unknown>, TResult = R
   const [state, setState] = useState<TaskState<TResult>>({ phase: "idle" });
   const pollRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // `run` awaits two round trips before any state change lands, so
+  // a double-click gets through twice and inserts two tasks — two
+  // charges for one result. A ref flips synchronously; state does not.
+  const inFlightRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (pollRef.current) window.clearInterval(pollRef.current);
@@ -49,10 +53,15 @@ export function useAsyncTask<TInput extends Record<string, unknown>, TResult = R
   useEffect(() => cleanup, [cleanup]);
 
   function applyRow(row: TaskRow<TResult>) {
-    if (row.status === "done" && row.result) {
-      setState({ phase: "done", taskId: row.id, result: row.result });
+    if (row.status === "done") {
+      // Note the missing `&& row.result`: a task that finishes with
+      // a null result is still finished. Requiring one left the UI
+      // spinning forever on a state it could never leave.
+      inFlightRef.current = false;
+      setState({ phase: "done", taskId: row.id, result: (row.result ?? {}) as TResult });
       cleanup();
     } else if (row.status === "failed") {
+      inFlightRef.current = false;
       setState({ phase: "failed", taskId: row.id, error: row.error ?? "Something went wrong." });
       cleanup();
     } else if (row.status === "running") {
@@ -60,11 +69,53 @@ export function useAsyncTask<TInput extends Record<string, unknown>, TResult = R
     }
   }
 
+  /** Watch a task that already exists — a retry, or one this
+   *  component wasn't mounted for when it was created. */
+  const watch = useCallback(
+    (taskId: string) => {
+      cleanup();
+      inFlightRef.current = true;
+      setState({ phase: "running", taskId });
+      subscribe(taskId);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cleanup]
+  );
+
+  function subscribe(taskId: string) {
+    // Realtime: push updates as they land.
+    channelRef.current = supabase
+      .channel(`task-${taskId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "tasks", filter: `id=eq.${taskId}` },
+        (payload) => applyRow(payload.new as TaskRow<TResult>)
+      )
+      .subscribe();
+
+    // Fallback: poll in case a Realtime event is missed.
+    pollRef.current = window.setInterval(async () => {
+      const { data: row } = await supabase
+        .from("tasks")
+        .select("id, status, result, error")
+        .eq("id", taskId)
+        .single();
+      if (row) applyRow(row as TaskRow<TResult>);
+    }, POLL_MS);
+  }
+
   const run = useCallback(async (input: TInput) => {
+    // Two clicks land inside the window below; the second must not
+    // create a second task.
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
     cleanup();
+    setState({ phase: "queued", taskId: "" });
 
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
+      inFlightRef.current = false;
       setState({ phase: "failed", taskId: "", error: "You need to be signed in." });
       return;
     }
@@ -76,38 +127,21 @@ export function useAsyncTask<TInput extends Record<string, unknown>, TResult = R
       .single();
 
     if (error || !data) {
+      inFlightRef.current = false;
       setState({ phase: "failed", taskId: "", error: error?.message ?? "Could not start the task." });
       return;
     }
 
     setState({ phase: "queued", taskId: data.id });
-
-    // Realtime: push updates as they land.
-    channelRef.current = supabase
-      .channel(`task-${data.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "tasks", filter: `id=eq.${data.id}` },
-        (payload) => applyRow(payload.new as TaskRow<TResult>)
-      )
-      .subscribe();
-
-    // Fallback: poll in case a Realtime event is missed.
-    pollRef.current = window.setInterval(async () => {
-      const { data: row } = await supabase
-        .from("tasks")
-        .select("id, status, result, error")
-        .eq("id", data.id)
-        .single();
-      if (row) applyRow(row as TaskRow<TResult>);
-    }, POLL_MS);
+    subscribe(data.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskType, cleanup]);
 
   const reset = useCallback(() => {
+    inFlightRef.current = false;
     cleanup();
     setState({ phase: "idle" });
   }, [cleanup]);
 
-  return { state, run, reset };
+  return { state, run, watch, reset };
 }

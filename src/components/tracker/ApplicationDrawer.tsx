@@ -26,32 +26,89 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
   const titleId = useId();
   const update = useUpdateApplication();
   const remove = useDeleteApplication();
+  const updateRef = useRef(update);
   const { data: resumes } = useResumes();
 
   const [notes, setNotes] = useState(item.notes ?? "");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const notesTimer = useRef<number | null>(null);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
+  // Held in a ref so the effects below can stay mount-only. `onClose`
+  // is an inline arrow from the board, new on every parent render —
+  // depending on it re-ran the focus effect on every keystroke's
+  // cache write, yanking the caret out of the notes box and onto the
+  // Close button, where the next space bar shut the drawer.
+  const onCloseRef = useRef(onClose);
+  const notesRef = useRef({ id: item.id, value: item.notes ?? "" });
 
+  // Assigned in an effect rather than during render: writing to a
+  // ref while rendering is what React Compiler flags, and it is
+  // genuinely unsafe under concurrent rendering.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    updateRef.current = update;
+    notesRef.current = { id: item.id, value: notes };
+  });
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    const opener = document.activeElement as HTMLElement | null;
+
+    function focusable(): HTMLElement[] {
+      return Array.from(
+        panel?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), select, input, textarea, a[href], [tabindex]:not([tabindex="-1"])'
+        ) ?? []
+      ).filter((el) => el.offsetParent !== null);
+    }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      // aria-modal is an assertion, not an implementation. Without
+      // this, tabbing walks straight out of the dialog and onto the
+      // board behind it.
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panel?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKey);
     // Move focus into the panel so a keyboard user isn't left
     // behind on the board with an open dialog they can't reach.
-    panelRef.current
-      ?.querySelector<HTMLElement>("button, select, input, textarea, a[href]")
-      ?.focus();
+    focusable()[0]?.focus();
 
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      // Put focus back where it came from, rather than dumping the
+      // person at the top of the document every time they close a card.
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, []);
 
   // A note typed and not yet flushed must survive the drawer
-  // closing — otherwise a fast close eats the last few characters.
+  // closing. Escape doesn't blur the textarea, so onBlur never fires
+  // and clearing the timer here would simply discard the last thing
+  // the person typed — under a label that says "saves as you type".
   useEffect(() => {
     return () => {
-      if (notesTimer.current) window.clearTimeout(notesTimer.current);
+      if (!notesTimer.current) return;
+      window.clearTimeout(notesTimer.current);
+      notesTimer.current = null;
+      const { id, value } = notesRef.current;
+      updateRef.current.mutate({ id, patch: { notes: value.trim() === "" ? null : value } });
     };
   }, []);
 
@@ -228,8 +285,11 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => {
+                  // Drop the pending note rather than PATCHing a row
+                  // that is being deleted in the same tick.
                   if (notesTimer.current) window.clearTimeout(notesTimer.current);
                   notesTimer.current = null;
+                  notesRef.current = { id: item.id, value: item.notes ?? "" };
                   remove.mutate(item.id);
                   onClose();
                 }}

@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { ApplicationItem } from "@/hooks/useApplications";
-import { money, relativeDays } from "@/lib/format";
+import { isOverdue, money, relativeDays } from "@/lib/format";
 import { STAGE_LABEL } from "@/lib/stages";
 
 interface CardProps {
@@ -26,7 +26,7 @@ interface CardProps {
 export const CardBody = forwardRef<HTMLDivElement, CardProps & { dragging?: boolean }>(
   function CardBody({ item, score, now, muted, overlay, dragging, onOpen, ...rest }, ref) {
     const nextAction = relativeDays(item.next_action_at, now);
-    const overdue = item.next_action_at != null && new Date(item.next_action_at).getTime() < now;
+    const overdue = isOverdue(item.next_action_at, now);
     const company = item.job.company?.canonical_name ?? "an unknown company";
 
     return (

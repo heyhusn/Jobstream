@@ -29,6 +29,18 @@ export function coverLetterKey(userId: string | undefined, jobId: string) {
   return ["cover-letter", userId, jobId] as const;
 }
 
+/**
+ * Identity of a *draft*, not of a row.
+ *
+ * Regeneration upserts on `unique (user_id, job_id)`, so the row id
+ * is unchanged — keying an editor on the id alone leaves it showing
+ * the previous draft after a regenerate, and the next keystroke
+ * saves that stale text back over the new one.
+ */
+export function draftKey(letter: Pick<CoverLetter, "id" | "generated_at">) {
+  return `${letter.id}:${letter.generated_at}`;
+}
+
 export function useCoverLetter(jobId: string | null) {
   const { user } = useAuth();
 
@@ -95,6 +107,40 @@ export function useUpdateCoverLetter(jobId: string | null) {
       if (ctx?.previous !== undefined) qc.setQueryData(key, ctx.previous);
     },
     onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+/**
+ * An unfinished cover_letter task for this job, if there is one.
+ *
+ * Without this, closing the drawer mid-generation loses the only
+ * handle on the running task: reopening shows the composer again,
+ * and clicking it spends a second credit on a letter already being
+ * written.
+ */
+export function useInFlightCoverLetterTask(jobId: string | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["cover-letter-task", user?.id, jobId ?? "none"],
+    enabled: !!user && !!jobId,
+    staleTime: 0,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("id, status, input, created_at")
+        .eq("user_id", user!.id)
+        .eq("task_type", "cover_letter")
+        .in("status", ["queued", "running"])
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      const match = (data ?? []).find(
+        (t) => (t.input as { job_id?: string } | null)?.job_id === jobId
+      );
+      return match?.id ?? null;
+    },
   });
 }
 
