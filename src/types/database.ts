@@ -14,6 +14,7 @@ export type TaskType =
   | "generate_matches"
   | "cover_letter"
   | "skill_gap"
+  | "resume_optimize"
   | "interview_turn";
 export type RemoteType = "remote" | "hybrid" | "onsite";
 export type RiskBand = "low" | "medium" | "high";

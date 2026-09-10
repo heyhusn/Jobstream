@@ -6,6 +6,7 @@ import type { ApplicationStage } from "@/types/database";
 import { STAGES } from "@/lib/stages";
 import { fromDateInput, money, toDateInput } from "@/lib/format";
 import { CoverLetterPanel } from "./CoverLetterPanel";
+import { ResumeOptimizerPanel } from "./ResumeOptimizerPanel";
 
 const NOTES_DEBOUNCE_MS = 700;
 
@@ -266,6 +267,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
             View posting
           </a>
 
+          <ResumeOptimizerPanel item={item} />
           <CoverLetterPanel item={item} />
         </div>
 
