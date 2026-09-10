@@ -17,6 +17,9 @@ const OnboardingPage = lazy(() =>
 const MatchesPage = lazy(() => import("@/pages/MatchesPage").then((m) => ({ default: m.MatchesPage })));
 const TrackerPage = lazy(() => import("@/pages/TrackerPage").then((m) => ({ default: m.TrackerPage })));
 const SkillsPage = lazy(() => import("@/pages/SkillsPage").then((m) => ({ default: m.SkillsPage })));
+const InterviewPrepPage = lazy(() =>
+  import("@/pages/InterviewPrepPage").then((m) => ({ default: m.InterviewPrepPage }))
+);
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
@@ -66,6 +69,7 @@ export default function App() {
                     <Route path="/matches" element={<MatchesPage />} />
                     <Route path="/tracker" element={<TrackerPage />} />
                     <Route path="/skills" element={<SkillsPage />} />
+                    <Route path="/interview/:sessionId" element={<InterviewPrepPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/settings/billing" element={<BillingPage />} />
                   </Route>

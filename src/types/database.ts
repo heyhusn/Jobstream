@@ -19,6 +19,20 @@ export type TaskType =
 export type RemoteType = "remote" | "hybrid" | "onsite";
 export type RiskBand = "low" | "medium" | "high";
 export type CoverLetterTone = "professional" | "warm" | "direct";
+export type InterviewMode = "behavioral" | "technical";
+export type InterviewSessionStatus = "active" | "completed";
+
+export interface InterviewTurn {
+  question: string;
+  answer: string | null;
+  feedback: string | null;
+  score: number | null;
+}
+export interface InterviewSummary {
+  overall_feedback: string;
+  strengths: string[];
+  areas_to_improve: string[];
+}
 export type ApplicationStage =
   | "saved"
   | "applied"
@@ -231,6 +245,27 @@ export interface Database {
         Update: Partial<
           Pick<Database["public"]["Tables"]["cover_letters"]["Row"], "subject" | "body">
         >;
+      } & Rel;
+      interview_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          job_id: string;
+          mode: InterviewMode;
+          status: InterviewSessionStatus;
+          turns: InterviewTurn[];
+          turn_count: number;
+          max_turns: number;
+          summary: InterviewSummary | null;
+          model: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        // No Insert/Update on purpose: every write goes through
+        // interview-prep under the service role, so a session's
+        // turns and summary always reflect a real evaluation.
+        Insert: never;
+        Update: never;
       } & Rel;
       credit_balances: {
         Row: {
