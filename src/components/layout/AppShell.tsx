@@ -6,6 +6,8 @@ import { CreditChip } from "@/components/ui/CreditChip";
 const links = [
   { to: "/matches", label: "Matches" },
   { to: "/tracker", label: "Tracker" },
+  { to: "/companies", label: "Companies" },
+  { to: "/salary", label: "Salary" },
   { to: "/skills", label: "Skills" },
   { to: "/settings", label: "Settings" },
 ];
