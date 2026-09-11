@@ -7,6 +7,7 @@ import { STAGES } from "@/lib/stages";
 import { fromDateInput, money, toDateInput } from "@/lib/format";
 import { CoverLetterPanel } from "./CoverLetterPanel";
 import { ResumeOptimizerPanel } from "./ResumeOptimizerPanel";
+import { AssistedApplyPanel } from "./AssistedApplyPanel";
 import { InterviewPrepPanel } from "./InterviewPrepPanel";
 
 const NOTES_DEBOUNCE_MS = 700;
@@ -269,6 +270,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
           </a>
 
           <ResumeOptimizerPanel item={item} />
+          <AssistedApplyPanel item={item} />
           <InterviewPrepPanel item={item} />
           <CoverLetterPanel item={item} />
         </div>

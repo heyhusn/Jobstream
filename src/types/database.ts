@@ -15,7 +15,8 @@ export type TaskType =
   | "cover_letter"
   | "skill_gap"
   | "resume_optimize"
-  | "interview_turn";
+  | "interview_turn"
+  | "assisted_apply";
 export type RemoteType = "remote" | "hybrid" | "onsite";
 export type RiskBand = "low" | "medium" | "high";
 export type CoverLetterTone = "professional" | "warm" | "direct";

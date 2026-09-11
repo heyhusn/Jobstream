@@ -27,6 +27,7 @@ const CompanyPage = lazy(() => import("@/pages/CompanyPage").then((m) => ({ defa
 const SalaryIntelligencePage = lazy(() =>
   import("@/pages/SalaryIntelligencePage").then((m) => ({ default: m.SalaryIntelligencePage }))
 );
+const AlertsPage = lazy(() => import("@/pages/AlertsPage").then((m) => ({ default: m.AlertsPage })));
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
@@ -80,6 +81,7 @@ export default function App() {
                     <Route path="/companies" element={<CompaniesIndexPage />} />
                     <Route path="/companies/:companyId" element={<CompanyPage />} />
                     <Route path="/salary" element={<SalaryIntelligencePage />} />
+                    <Route path="/alerts" element={<AlertsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/settings/billing" element={<BillingPage />} />
                   </Route>
