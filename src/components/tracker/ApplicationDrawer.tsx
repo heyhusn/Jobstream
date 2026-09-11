@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import clsx from "clsx";
 import type { ApplicationItem, ApplicationPatch } from "@/hooks/useApplications";
 import { useDeleteApplication, useResumes, useUpdateApplication } from "@/hooks/useApplications";
@@ -261,14 +262,24 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
             />
           </Field>
 
-          <a
-            href={item.job.apply_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper"
-          >
-            View posting
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={item.job.apply_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper"
+            >
+              View posting
+            </a>
+            {item.job.company && (
+              <Link
+                to={`/companies/${item.job.company.id}`}
+                className="inline-block rounded-app border-[1.5px] border-rule px-3 py-1.5 text-sm font-medium text-ink-70 transition-colors hover:border-ink hover:text-ink"
+              >
+                View company
+              </Link>
+            )}
+          </div>
 
           <ResumeOptimizerPanel item={item} />
           <AssistedApplyPanel item={item} />

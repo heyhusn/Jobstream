@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import {
+  useAdminAction,
   useAdminOverview,
   useAdminSourceHealth,
   useAdminTaskHealth,
   useIsAdmin,
+  type AdminActionName,
   type SourceHealthRow,
   type TaskHealthRow,
 } from "@/hooks/useAdmin";
@@ -54,6 +57,8 @@ export function AdminPage() {
           touches it.
         </p>
       </div>
+
+      <ActionsPanel />
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold">Overview</h2>
@@ -105,6 +110,91 @@ export function AdminPage() {
         {sourceHealth && sourceHealth.length > 0 && <SourceHealthTable rows={sourceHealth} />}
       </section>
     </div>
+  );
+}
+
+const ACTIONS: { name: AdminActionName; label: string; description: string }[] = [
+  {
+    name: "ingest_jobs",
+    label: "Run ingestion",
+    description: "Pulls the latest postings from the configured Greenhouse boards, right now.",
+  },
+  {
+    name: "recompute_ghost_signals",
+    label: "Recompute ghost signals",
+    description: "Re-scores every active job's ghost-risk band with today's days-open figure.",
+  },
+  {
+    name: "send_notification_digest",
+    label: "Send notification digest",
+    description:
+      "Emails everyone with unread notifications — inert (503) until a real Resend key is configured.",
+  },
+];
+
+/**
+ * The part that makes this a console rather than a dashboard: before
+ * this existed, ingestion and the notification digest could only be
+ * triggered by curl with a secret that must never reach the browser.
+ * `admin-action` holds that secret server-side and re-checks
+ * `is_admin()` itself against the caller's verified identity — this
+ * panel being reachable client-side grants nothing on its own.
+ */
+function ActionsPanel() {
+  const action = useAdminAction();
+  const [running, setRunning] = useState<AdminActionName | null>(null);
+  const [lastResult, setLastResult] = useState<{ name: AdminActionName; message: string; ok: boolean } | null>(
+    null
+  );
+
+  function run(name: AdminActionName) {
+    setRunning(name);
+    setLastResult(null);
+    action.mutate(name, {
+      onSuccess: (data) => {
+        setRunning(null);
+        const summary =
+          name === "recompute_ghost_signals"
+            ? `Recomputed ${data?.jobs_recomputed ?? "?"} jobs.`
+            : JSON.stringify(data?.result ?? data);
+        setLastResult({ name, message: summary, ok: data?.success !== false });
+      },
+      onError: (error) => {
+        setRunning(null);
+        setLastResult({
+          name,
+          message: error instanceof Error ? error.message : "Something went wrong.",
+          ok: false,
+        });
+      },
+    });
+  }
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 text-sm font-semibold">Actions</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {ACTIONS.map((a) => (
+          <div key={a.name} className="rounded-app border border-rule bg-raised px-4 py-3.5">
+            <p className="text-sm font-semibold">{a.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-70">{a.description}</p>
+            <button
+              type="button"
+              onClick={() => run(a.name)}
+              disabled={running !== null}
+              className="mt-3 rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {running === a.name ? "Running…" : "Run"}
+            </button>
+            {lastResult && lastResult.name === a.name && (
+              <p className={`mt-2 text-xs ${lastResult.ok ? "text-live" : "text-ghost"}`}>
+                {lastResult.message}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

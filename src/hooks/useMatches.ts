@@ -17,7 +17,7 @@ export interface MatchListItem {
     salary_currency: string;
     apply_url: string;
     posted_at: string | null;
-    company: { canonical_name: string } | null;
+    company: { id: string; canonical_name: string } | null;
   };
   ghost: { risk_band: RiskBand; reasons: string[] } | null;
 }
@@ -43,7 +43,7 @@ interface RawMatchRow {
     salary_currency: string;
     apply_url: string;
     posted_at: string | null;
-    company: { canonical_name: string } | null;
+    company: { id: string; canonical_name: string } | null;
     ghost_signals: { risk_band: RiskBand; reasons: string[] }[] | null;
   };
 }
@@ -62,7 +62,7 @@ export function useMatches() {
            job:jobs (
              id, title, location, remote_type, salary_min, salary_max,
              salary_currency, apply_url, posted_at,
-             company:companies ( canonical_name ),
+             company:companies ( id, canonical_name ),
              ghost_signals ( risk_band, reasons )
            )`
         )

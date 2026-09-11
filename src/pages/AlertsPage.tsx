@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { money } from "@/lib/format";
@@ -376,7 +377,14 @@ function MatchRow({ job }: { job: AlertJob }) {
           )}
         </div>
         <div className="mt-0.5 truncate text-sm text-ink-45">
-          {job.company?.canonical_name ?? "Unknown company"} — {job.location ?? "Location not listed"}
+          {job.company ? (
+            <Link to={`/companies/${job.company.id}`} className="hover:underline">
+              {job.company.canonical_name}
+            </Link>
+          ) : (
+            "Unknown company"
+          )}{" "}
+          — {job.location ?? "Location not listed"}
           {job.remote_type ? ` — ${job.remote_type}` : ""}
           {" — "}
           {money(job.salary_min, job.salary_max, job.salary_currency)}

@@ -48,7 +48,7 @@ export interface AlertJob {
   salary_currency: string;
   apply_url: string;
   first_seen_at: string;
-  company: { canonical_name: string } | null;
+  company: { id: string; canonical_name: string } | null;
   risk_band: RiskBand | null;
 }
 
@@ -233,7 +233,7 @@ interface RawAlertMatchRow {
   salary_currency: string;
   apply_url: string;
   first_seen_at: string;
-  company: { canonical_name: string } | null;
+  company: { id: string; canonical_name: string } | null;
   ghost_signals: { risk_band: RiskBand }[] | null;
 }
 
@@ -268,7 +268,7 @@ export function useAlertMatches(filter: AlertFilter) {
         .select(
           `id, title, location, remote_type, salary_min, salary_max, salary_currency,
            apply_url, first_seen_at,
-           company:companies ( canonical_name ),
+           company:companies ( id, canonical_name ),
            ghost_signals ( risk_band )`
         )
         .eq("is_active", true)

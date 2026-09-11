@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
@@ -80,6 +81,47 @@ export interface SourceHealthRow {
   total_jobs: number;
   active_jobs: number;
   last_ingested_at: string | null;
+}
+
+export type AdminActionName = "ingest_jobs" | "recompute_ghost_signals" | "send_notification_digest";
+
+/**
+ * Runs a real, privileged action (manual ingestion, ghost-signal
+ * recompute, or an email-digest send) via the `admin-action` Edge
+ * Function. That function holds `TASK_DISPATCH_SECRET` server-side —
+ * it never reaches the browser — and re-checks `is_admin()` itself
+ * against the caller's own verified identity, so this hook being
+ * reachable in the client bundle grants nothing on its own.
+ */
+export function useAdminAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (action: AdminActionName) => {
+      const { data, error } = await supabase.functions.invoke("admin-action", {
+        body: { action },
+      });
+      if (error) {
+        const context = (error as { context?: Response }).context;
+        let detail: string | null = null;
+        if (context) {
+          try {
+            const body = await context.json();
+            if (typeof body?.error === "string") detail = body.error;
+          } catch {
+            // context wasn't JSON — fall through to the generic error
+          }
+        }
+        throw detail ? new Error(detail) : error;
+      }
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-source-health"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-task-health", 24] });
+    },
+  });
 }
 
 export function useAdminSourceHealth(enabled: boolean) {

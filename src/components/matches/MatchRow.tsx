@@ -98,6 +98,15 @@ export function MatchRow({ item }: { item: MatchListItem }) {
               View posting
             </a>
 
+            {item.job.company && (
+              <Link
+                to={`/companies/${item.job.company.id}`}
+                className="inline-block rounded-app border-[1.5px] border-rule px-3 py-1.5 text-sm font-medium text-ink-70 transition-colors hover:border-ink hover:text-ink"
+              >
+                View company
+              </Link>
+            )}
+
             {/* Saving is the funnel into the tracker, so it reads as
                 a state ("Saved to tracker") rather than resetting to
                 an inviting button the moment it succeeds. */}
