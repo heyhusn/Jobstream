@@ -170,7 +170,18 @@ Deno.serve(async (req) => {
       questions,
     };
 
-    // ── charge, then generate ─────────────────────────────────
+    // ── cost guardrail, then charge, then generate ────────────
+    // See 0017_cost_guardrails.sql — a user's own credit balance
+    // only protects against that user overusing their own allowance,
+    // not against the whole app's total DeepSeek spend.
+    const { data: budgetOk, error: budgetErr } = await supabase.rpc("cost_budget_ok");
+    if (budgetErr) throw budgetErr;
+    if (budgetOk === false) {
+      throw new UserFacing(
+        "AI features are temporarily paused — today's model budget has been reached. Try again after midnight UTC."
+      );
+    }
+
     // One charge per batch of questions, not per question — set
     // before the await so a lost response still leaves the catch
     // block able to refund it.
@@ -186,7 +197,7 @@ Deno.serve(async (req) => {
       throw new UserFacing("You're out of credits for this month.");
     }
 
-    const answers = await generateWithRetry(ctx);
+    const answers = await generateWithRetry(ctx, supabase, userId, taskId);
 
     // ── persist ───────────────────────────────────────────────
     // No dedicated table, same as skill_gap/resume_optimize — the
@@ -264,14 +275,23 @@ Deno.serve(async (req) => {
   }
 });
 
-async function generateWithRetry(ctx: AssistedApplyContext) {
+async function generateWithRetry(
+  ctx: AssistedApplyContext,
+  supabase: SupabaseClient,
+  userId: string | null,
+  taskId: string | null
+) {
   const ATTEMPTS = 2;
   const deadline = Date.now() + LLM_BUDGET_MS;
 
   for (let attempt = 1; ; attempt++) {
     const remaining = deadline - Date.now();
     try {
-      const raw = await callDeepSeek(buildMessages(ctx), Math.min(LLM_TIMEOUT_MS, remaining));
+      const raw = await callDeepSeek(buildMessages(ctx), Math.min(LLM_TIMEOUT_MS, remaining), {
+        supabase,
+        userId,
+        taskId,
+      });
       return parseAnswers(raw, ctx.questions);
     } catch (e) {
       const budgetLeft = deadline - Date.now();
@@ -297,7 +317,8 @@ function requireEnv(name: string): string {
 
 async function callDeepSeek(
   messages: { role: string; content: string }[],
-  timeoutMs: number
+  timeoutMs: number,
+  usageCtx: { supabase: SupabaseClient; userId: string | null; taskId: string | null }
 ): Promise<string> {
   const key = Deno.env.get("DEEPSEEK_API_KEY");
   if (!key) {
@@ -333,6 +354,22 @@ async function callDeepSeek(
     }
 
     const data = await response.json();
+
+    // Logged for every real response received, successful content or
+    // not — DeepSeek billed for this call either way. Never let a
+    // logging failure break a generation that otherwise succeeded.
+    try {
+      await usageCtx.supabase.rpc("log_llm_usage", {
+        p_user_id: usageCtx.userId,
+        p_task_id: usageCtx.taskId,
+        p_feature: FEATURE,
+        p_prompt_tokens: data?.usage?.prompt_tokens ?? 0,
+        p_completion_tokens: data?.usage?.completion_tokens ?? 0,
+      });
+    } catch (e) {
+      console.error("log_llm_usage failed:", e);
+    }
+
     const content = data?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || content.trim() === "") {
       throw new UnusableResponse("The model returned an empty response.", true);

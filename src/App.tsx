@@ -28,6 +28,12 @@ const SalaryIntelligencePage = lazy(() =>
   import("@/pages/SalaryIntelligencePage").then((m) => ({ default: m.SalaryIntelligencePage }))
 );
 const AlertsPage = lazy(() => import("@/pages/AlertsPage").then((m) => ({ default: m.AlertsPage })));
+const AnalyticsPage = lazy(() =>
+  import("@/pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage }))
+);
+const NotificationsPage = lazy(() =>
+  import("@/pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage }))
+);
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
@@ -82,6 +88,8 @@ export default function App() {
                     <Route path="/companies/:companyId" element={<CompanyPage />} />
                     <Route path="/salary" element={<SalaryIntelligencePage />} />
                     <Route path="/alerts" element={<AlertsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/settings/billing" element={<BillingPage />} />
                   </Route>

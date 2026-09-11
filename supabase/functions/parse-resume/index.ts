@@ -73,6 +73,18 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Not enough text' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Cost guardrail — see 0017_cost_guardrails.sql. This is the one
+    // DeepSeek call in the app with no credit charge at all (parsing
+    // a resume is a required onboarding step, not a paid feature), so
+    // the daily spend cap is the only thing protecting the operator
+    // from this path running up real cost.
+    const { data: budgetOk, error: budgetErr } = await supabase.rpc('cost_budget_ok');
+    if (budgetErr) throw budgetErr;
+    if (budgetOk === false) {
+      await supabase.from('tasks').update({ status: 'failed', error: "AI features are temporarily paused — today's model budget has been reached. Try again after midnight UTC." }).eq('id', taskId);
+      return new Response(JSON.stringify({ error: 'Daily model budget reached.' }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Call DeepSeek
     // Was a literal committed to the repo. Rotate that key.
     const deepSeekKey = Deno.env.get('DEEPSEEK_API_KEY');
@@ -120,6 +132,22 @@ ${extractedText.substring(0, 8000)}
     }
 
     const dsData = await dsResponse.json();
+
+    // Logged regardless of what happens to the content below —
+    // DeepSeek billed for this call either way. Never let a logging
+    // failure break a parse that otherwise succeeded.
+    try {
+      await supabase.rpc('log_llm_usage', {
+        p_user_id: taskRow.user_id,
+        p_task_id: taskId,
+        p_feature: 'parse_resume',
+        p_prompt_tokens: dsData?.usage?.prompt_tokens ?? 0,
+        p_completion_tokens: dsData?.usage?.completion_tokens ?? 0,
+      });
+    } catch (e) {
+      console.error('log_llm_usage failed:', e);
+    }
+
     let result;
     try {
       let content = dsData.choices[0].message.content;

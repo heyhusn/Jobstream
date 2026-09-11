@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
 import { CreditChip } from "@/components/ui/CreditChip";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 const links = [
   { to: "/matches", label: "Matches" },
@@ -9,6 +10,7 @@ const links = [
   { to: "/companies", label: "Companies" },
   { to: "/salary", label: "Salary" },
   { to: "/alerts", label: "Alerts" },
+  { to: "/analytics", label: "Analytics" },
   { to: "/skills", label: "Skills" },
   { to: "/settings", label: "Settings" },
 ];
@@ -39,6 +41,7 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
+          <NotificationBell />
           <CreditChip />
           <button
             onClick={() => signOut()}

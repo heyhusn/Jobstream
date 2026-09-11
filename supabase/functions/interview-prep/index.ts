@@ -223,6 +223,20 @@ async function handleStart(
     description: job.description ?? "",
   };
 
+  // Checked before spending anything new — see 0017_cost_guardrails.sql.
+  // Only gated here, at the point a fresh session is chosen, not in
+  // handleAnswer: interrupting a session already paid for partway
+  // through a hard-capped 5-turn conversation would trade a small,
+  // bounded, already-committed cost for a materially worse
+  // experience — truncating something the person already started.
+  const { data: budgetOk, error: budgetErr } = await supabase.rpc("cost_budget_ok");
+  if (budgetErr) throw budgetErr;
+  if (budgetOk === false) {
+    throw new UserFacing(
+      "AI features are temporarily paused — today's model budget has been reached. Try again after midnight UTC."
+    );
+  }
+
   // Charged before the model call, refunded on any failure below —
   // same reasoning as every other credit-charging function here.
   const { data: ok, error: creditErr } = await supabase.rpc("consume_credit", {
@@ -237,8 +251,12 @@ async function handleStart(
 
   let question: string;
   try {
-    question = await generateWithRetry(() => buildOpeningMessages(mode, jobCtx, candidate), (raw) =>
-      parseOpening(raw)
+    question = await generateWithRetry(
+      () => buildOpeningMessages(mode, jobCtx, candidate),
+      (raw) => parseOpening(raw),
+      supabase,
+      userId,
+      null
     );
   } catch (e) {
     // Refund needs to happen even though this isn't the outer catch —
@@ -361,7 +379,10 @@ async function handleAnswer(
 
   const evaluation = await generateWithRetry(
     () => buildAnswerMessages(mode, jobCtx, candidate, turns, isFinalTurn),
-    (raw) => parseAnswerEval(raw, isFinalTurn)
+    (raw) => parseAnswerEval(raw, isFinalTurn),
+    supabase,
+    userId,
+    null
   );
 
   turns[currentIndex] = { ...turns[currentIndex], feedback: evaluation.feedback, score: evaluation.score };
@@ -406,7 +427,10 @@ async function handleAnswer(
 
 async function generateWithRetry<T>(
   build: () => { role: "system" | "user"; content: string }[],
-  parse: (raw: string) => T
+  parse: (raw: string) => T,
+  supabase: SupabaseClient,
+  userId: string | null,
+  taskId: string | null
 ): Promise<T> {
   const ATTEMPTS = 2;
   const deadline = Date.now() + LLM_BUDGET_MS;
@@ -414,7 +438,13 @@ async function generateWithRetry<T>(
   for (let attempt = 1; ; attempt++) {
     const remaining = deadline - Date.now();
     try {
-      return parse(await callDeepSeek(build(), Math.min(LLM_TIMEOUT_MS, remaining)));
+      return parse(
+        await callDeepSeek(build(), Math.min(LLM_TIMEOUT_MS, remaining), {
+          supabase,
+          userId,
+          taskId,
+        })
+      );
     } catch (e) {
       const budgetLeft = deadline - Date.now();
       const worthRetrying =
@@ -435,7 +465,8 @@ function requireEnv(name: string): string {
 
 async function callDeepSeek(
   messages: { role: string; content: string }[],
-  timeoutMs: number
+  timeoutMs: number,
+  usageCtx: { supabase: SupabaseClient; userId: string | null; taskId: string | null }
 ): Promise<string> {
   const key = Deno.env.get("DEEPSEEK_API_KEY");
   if (!key) {
@@ -471,6 +502,22 @@ async function callDeepSeek(
     }
 
     const data = await response.json();
+
+    // Logged for every real response received, successful content or
+    // not — DeepSeek billed for this call either way. Never let a
+    // logging failure break a generation that otherwise succeeded.
+    try {
+      await usageCtx.supabase.rpc("log_llm_usage", {
+        p_user_id: usageCtx.userId,
+        p_task_id: usageCtx.taskId,
+        p_feature: FEATURE,
+        p_prompt_tokens: data?.usage?.prompt_tokens ?? 0,
+        p_completion_tokens: data?.usage?.completion_tokens ?? 0,
+      });
+    } catch (e) {
+      console.error("log_llm_usage failed:", e);
+    }
+
     const content = data?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || content.trim() === "") {
       throw new UnusableResponse("The model returned an empty response.", true);
