@@ -34,6 +34,7 @@ const AnalyticsPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("@/pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage }))
 );
+const AdminPage = lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
@@ -90,6 +91,7 @@ export default function App() {
                     <Route path="/alerts" element={<AlertsPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
+                    <Route path="/admin" element={<AdminPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/settings/billing" element={<BillingPage />} />
                   </Route>

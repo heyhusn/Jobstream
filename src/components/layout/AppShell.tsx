@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useAdmin";
 import { CreditChip } from "@/components/ui/CreditChip";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 
@@ -17,6 +18,11 @@ const links = [
 
 export function AppShell() {
   const { signOut } = useAuth();
+  // Server-side RPCs are the real gate (see is_admin() in
+  // 0020_admin_console.sql) — this only decides whether to show a
+  // link that would otherwise 403 for everyone else.
+  const { data: isAdmin } = useIsAdmin();
+  const visibleLinks = isAdmin ? [...links, { to: "/admin", label: "Admin" }] : links;
 
   return (
     <div className="min-h-screen bg-paper">
@@ -26,7 +32,7 @@ export function AppShell() {
             job<span className="text-live">spy</span>
           </span>
           <nav className="hidden items-center gap-6 sm:flex">
-            {links.map((l) => (
+            {visibleLinks.map((l) => (
               <NavLink
                 key={l.to}
                 to={l.to}
