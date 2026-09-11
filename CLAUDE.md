@@ -133,6 +133,8 @@ another user's task row by guessing/learning its UUID.
 - Fixed a live bug shared by `parse-resume` and `generate-matches`: both re-read the task row (a security fix — never trust `user_id` from the request body) *before* the Supabase client that query needs existed. Every invocation of either function was throwing. Client init now happens first in both.
 - Implemented the Ghost Job Detector (M07): `supabase/migrations/0007_ghost_job_detector.sql` adds `compute_ghost_signal()` (deterministic scoring — days-open, reposts, salary disclosure, first-party-ATS-vs-aggregator source, optional company fill-rate), a trigger that recomputes it on relevant `jobs` column changes, and a backfill. `seed.sql`'s hand-written `ghost_signals` rows were removed since the trigger now produces them from the job data itself.
 
+- Agent Orchestration (M17) is implemented locally but not yet deployed: migration `0015_agent_orchestration.sql` adds a service-role-owned `agent_runs` state machine. The `orchestrate-application` Edge Function advances a fixed two-step run (resume optimisation, then cover letter) only from terminal child-task updates, so pg_net's at-least-once delivery cannot run steps twice. `AgentOrchestrationPanel.tsx` mounts in the application drawer. It never overwrites an existing cover letter: that step is marked skipped. Deploying requires `npx supabase db push` and `npx supabase functions deploy orchestrate-application`, followed by a live run with at least two credits.
+
 ## Where to look for more
 
 - `SETUP.md` — local dev setup, full "what's real vs stubbed" list, credit-charging design rationale.
