@@ -10,6 +10,7 @@ import {
   useAddCompanyContact,
   useDeleteCompanyContact,
 } from "@/hooks/useCompanyContacts";
+import { useInterviewQuestionsForCompany } from "@/hooks/useAnalytics";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import type { RiskBand } from "@/types/database";
@@ -169,7 +170,38 @@ export function CompanyPage() {
       </section>
 
       <CompanyContactsSection companyId={companyId} />
+      <InterviewQuestionsSection companyId={companyId} />
     </div>
+  );
+}
+
+/**
+ * Minor m29: every question the signed-in user has personally been
+ * asked across their own AI interview-prep sessions (M13) for jobs
+ * at this company — grounded in their real sessions, not fabricated,
+ * and never another user's questions (RLS on `interview_sessions`
+ * scopes the underlying view before this ever renders).
+ */
+function InterviewQuestionsSection({ companyId }: { companyId: string | undefined }) {
+  const { data: questions } = useInterviewQuestionsForCompany(companyId);
+
+  if (!questions || questions.length === 0) return null;
+
+  return (
+    <section className="mt-6">
+      <h2 className="mb-3 text-sm font-semibold">Interview questions you've been asked here</h2>
+      <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+        {questions.map((q, i) => (
+          <div key={i} className="py-2.5 text-sm">
+            <p>{q.question}</p>
+            <p className="mt-0.5 text-xs text-ink-45">
+              {q.mode} · {new Date(q.asked_at).toLocaleDateString()}
+              {q.score != null ? ` · scored ${q.score}/5` : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

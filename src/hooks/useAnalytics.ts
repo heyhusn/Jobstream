@@ -158,3 +158,162 @@ export function useInterviewProgress() {
     },
   });
 }
+
+// ── Response rate (minor m26) ────────────────────────────────────
+// "Responded" = interviewing, offer, or an explicit rejection —
+// silence (still sitting at "applied") and self-withdrawals don't
+// count as a response either way. See migration 0029's header.
+
+export interface ResponseRateRow {
+  applied_count: number;
+  responded_count: number;
+}
+
+export interface ResponseRateByCompanyRow extends ResponseRateRow {
+  company_id: string | null;
+  canonical_name: string | null;
+}
+export interface ResponseRateBySourceRow extends ResponseRateRow {
+  source: string;
+}
+export interface ResponseRateByResumeVersionRow extends ResponseRateRow {
+  resume_version_id: string;
+  version: number;
+  track_name: string | null;
+}
+
+const responseRateByCompanyTable = () => supabase.from("my_response_rate_by_company" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+const responseRateBySourceTable = () => supabase.from("my_response_rate_by_source" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+const responseRateByResumeTable = () => supabase.from("my_response_rate_by_resume_version" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+export function useResponseRateByCompany() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-response-rate-company", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<ResponseRateByCompanyRow[]> => {
+      const { data, error } = await responseRateByCompanyTable().select(
+        "company_id, canonical_name, applied_count, responded_count"
+      );
+      if (error) throw error;
+      return (data ?? []) as unknown as ResponseRateByCompanyRow[];
+    },
+  });
+}
+
+export function useResponseRateBySource() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-response-rate-source", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<ResponseRateBySourceRow[]> => {
+      const { data, error } = await responseRateBySourceTable().select(
+        "source, applied_count, responded_count"
+      );
+      if (error) throw error;
+      return (data ?? []) as unknown as ResponseRateBySourceRow[];
+    },
+  });
+}
+
+export function useResponseRateByResumeVersion() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-response-rate-resume", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<ResponseRateByResumeVersionRow[]> => {
+      const { data, error } = await responseRateByResumeTable().select(
+        "resume_version_id, version, track_name, applied_count, responded_count"
+      );
+      if (error) throw error;
+      return (data ?? []) as unknown as ResponseRateByResumeVersionRow[];
+    },
+  });
+}
+
+// ── Platform benchmark (minor m28) ───────────────────────────────
+// Calls a security-definer RPC, not a view — see migration 0029's
+// header for why a genuine cross-user aggregate can't be an invoker
+// view over RLS-scoped `applications`.
+
+export interface PlatformBenchmark {
+  median_response_rate: number | null;
+  contributing_users: number;
+}
+
+export function usePlatformResponseRateBenchmark() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-platform-benchmark", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<PlatformBenchmark | null> => {
+      const { data, error } = await supabase.rpc("platform_response_rate_benchmark" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (error) throw error;
+      const row = (data as unknown as PlatformBenchmark[])?.[0];
+      return row ?? null;
+    },
+  });
+}
+
+// ── Interview question bank per company (minor m29) ──────────────
+
+export interface InterviewQuestionRow {
+  company_id: string | null;
+  canonical_name: string | null;
+  job_id: string;
+  mode: InterviewMode;
+  question: string;
+  score: number | null;
+  asked_at: string;
+}
+
+const questionBankTable = () => supabase.from("my_interview_question_bank" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+export function useInterviewQuestionBank() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-question-bank", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<InterviewQuestionRow[]> => {
+      const { data, error } = await questionBankTable()
+        .select("company_id, canonical_name, job_id, mode, question, score, asked_at")
+        .order("asked_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as InterviewQuestionRow[];
+    },
+  });
+}
+
+/** Just this one company's questions — CompanyPage.tsx filters the full bank rather than a per-company round trip. */
+export function useInterviewQuestionsForCompany(companyId: string | undefined) {
+  const { data: all, ...rest } = useInterviewQuestionBank();
+  return {
+    ...rest,
+    data: companyId ? all?.filter((q) => q.company_id === companyId) : undefined,
+  };
+}
+
+// ── Skill-demand trendline (minor m30) ───────────────────────────
+
+export interface SkillDemandRow {
+  skill: string;
+  week: string;
+  job_count: number;
+}
+
+const skillDemandTable = () => supabase.from("my_skill_demand_trend" as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+export function useSkillDemandTrend() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["analytics-skill-demand", user?.id],
+    enabled: !!user,
+    queryFn: async (): Promise<SkillDemandRow[]> => {
+      const { data, error } = await skillDemandTable()
+        .select("skill, week, job_count")
+        .order("week", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as SkillDemandRow[];
+    },
+  });
+}

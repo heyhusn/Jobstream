@@ -1,15 +1,24 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   useApplicationFunnel,
   useCreditUsage,
   useTrackedGhostExposure,
   useMatchScoreTrend,
   useInterviewProgress,
+  useResponseRateByCompany,
+  useResponseRateBySource,
+  useResponseRateByResumeVersion,
+  usePlatformResponseRateBenchmark,
+  useSkillDemandTrend,
   type ExposureBand,
+  type ResponseRateRow,
 } from "@/hooks/useAnalytics";
+import { useApplications } from "@/hooks/useApplications";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { STAGES } from "@/lib/stages";
+
+const MIN_RESPONSE_SAMPLE = 3;
 
 // Below this sample size a trend day is called out as thin rather
 // than plotted as if it carried the same weight as a well-sampled
@@ -73,6 +82,12 @@ export function AnalyticsPage() {
   const ghostExposure = useTrackedGhostExposure();
   const scoreTrend = useMatchScoreTrend();
   const interviewProgress = useInterviewProgress();
+  const { data: applications } = useApplications();
+  const responseByCompany = useResponseRateByCompany();
+  const responseBySource = useResponseRateBySource();
+  const responseByResume = useResponseRateByResumeVersion();
+  const benchmark = usePlatformResponseRateBenchmark();
+  const skillDemand = useSkillDemandTrend();
 
   return (
     <div>
@@ -81,9 +96,13 @@ export function AnalyticsPage() {
         <p className="mt-1 text-sm text-ink-70">
           Your own activity only — pipeline, credit spend, ghost-risk exposure on jobs you're
           tracking, match score trend, and interview prep progress. Nothing here is aggregated
-          across other users.
+          across other users, except the one platform-wide median explicitly called out below.
         </p>
       </div>
+
+      <Section title="This week">
+        <WeeklyDigestSection applications={applications} />
+      </Section>
 
       <Section title="Your pipeline">
         <PipelineSection
@@ -129,6 +148,218 @@ export function AnalyticsPage() {
           onRetry={() => interviewProgress.refetch()}
         />
       </Section>
+
+      <Section title="Response rate">
+        <ResponseRateSection
+          byCompany={responseByCompany.data}
+          bySource={responseBySource.data}
+          byResume={responseByResume.data}
+          isPending={responseByCompany.isPending}
+          benchmark={benchmark.data}
+        />
+      </Section>
+
+      <Section title="Skill demand">
+        <SkillDemandSection isPending={skillDemand.isPending} rows={skillDemand.data} />
+      </Section>
+    </div>
+  );
+}
+
+// ── Weekly digest (minor m27) ─────────────────────────────────────
+// Computed on-demand from applications already loaded, not a
+// scheduled email — no pg_cron and no email provider key exist in
+// this codebase (see migration 0029's header), so "weekly" can only
+// honestly mean "the last 7 days, whenever you look."
+
+function WeeklyDigestSection({ applications }: { applications: ReturnType<typeof useApplications>["data"] }) {
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const all = applications ?? [];
+    const inWindow = (iso: string | null, from: number, to: number) => {
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
+      return t >= from && t < to;
+    };
+    const thisWeekStart = now - 7 * DAY;
+    const lastWeekStart = now - 14 * DAY;
+
+    const appliedThisWeek = all.filter((a) => inWindow(a.applied_at, thisWeekStart, now)).length;
+    const appliedLastWeek = all.filter((a) => inWindow(a.applied_at, lastWeekStart, thisWeekStart)).length;
+    const respondedThisWeek = all.filter(
+      (a) =>
+        (a.stage === "interviewing" || a.stage === "offer" || a.stage === "rejected") &&
+        inWindow(a.updated_at, thisWeekStart, now)
+    ).length;
+
+    return { appliedThisWeek, appliedLastWeek, respondedThisWeek };
+  }, [applications]);
+
+  if (!applications) return <SkeletonBlock className="h-20" />;
+
+  return (
+    <div className="flex flex-wrap gap-6 rounded-app border border-rule bg-raised px-4 py-4">
+      <DigestStat label="Applied" value={stats.appliedThisWeek} compareTo={stats.appliedLastWeek} />
+      <DigestStat label="Responses received" value={stats.respondedThisWeek} />
+    </div>
+  );
+}
+
+function DigestStat({ label, value, compareTo }: { label: string; value: number; compareTo?: number }) {
+  return (
+    <div>
+      <p className="text-xs text-ink-45">{label}, last 7 days</p>
+      <p className="tabular text-xl font-semibold">{value}</p>
+      {compareTo != null && (
+        <p className="text-xs text-ink-45">{compareTo} the week before</p>
+      )}
+    </div>
+  );
+}
+
+// ── Response rate (minor m26 + m28) ───────────────────────────────
+
+function rate(row: ResponseRateRow): number | null {
+  return row.applied_count > 0 ? row.responded_count / row.applied_count : null;
+}
+
+function ResponseRateSection({
+  byCompany,
+  bySource,
+  byResume,
+  isPending,
+  benchmark,
+}: {
+  byCompany: import("@/hooks/useAnalytics").ResponseRateByCompanyRow[] | undefined;
+  bySource: import("@/hooks/useAnalytics").ResponseRateBySourceRow[] | undefined;
+  byResume: import("@/hooks/useAnalytics").ResponseRateByResumeVersionRow[] | undefined;
+  isPending: boolean;
+  benchmark: { median_response_rate: number | null; contributing_users: number } | null | undefined;
+}) {
+  if (isPending) return <SkeletonBlock className="h-32" />;
+
+  const totalApplied = (byCompany ?? []).reduce((s, r) => s + r.applied_count, 0);
+  if (totalApplied === 0) {
+    return (
+      <EmptyState
+        title="No applications yet"
+        body="Response rate is computed once you've moved at least one job past 'Saved' to 'Applied'."
+      />
+    );
+  }
+
+  const overallResponded = (byCompany ?? []).reduce((s, r) => s + r.responded_count, 0);
+  const overallRate = overallResponded / totalApplied;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-app border border-rule bg-raised px-4 py-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-ink-70">Your overall response rate</span>
+          <span className="tabular text-lg font-semibold">{Math.round(overallRate * 100)}%</span>
+        </div>
+        {benchmark?.median_response_rate != null && (
+          <p className="mt-1 text-xs text-ink-45">
+            Platform median: {Math.round(benchmark.median_response_rate * 100)}% across{" "}
+            {benchmark.contributing_users} {benchmark.contributing_users === 1 ? "user" : "users"}
+            {benchmark.contributing_users < 5 ? " — too few to read as a reliable median" : ""}.
+          </p>
+        )}
+      </div>
+
+      <ResponseRateBreakdown
+        title="By company"
+        rows={(byCompany ?? []).map((r) => ({ label: r.canonical_name ?? "Unknown company", ...r }))}
+      />
+      <ResponseRateBreakdown
+        title="By source"
+        rows={(bySource ?? []).map((r) => ({ label: r.source, ...r }))}
+      />
+      <ResponseRateBreakdown
+        title="By resume version"
+        rows={(byResume ?? []).map((r) => ({
+          label: `v${r.version}${r.track_name ? ` — ${r.track_name}` : ""}`,
+          ...r,
+        }))}
+      />
+    </div>
+  );
+}
+
+function ResponseRateBreakdown({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: (ResponseRateRow & { label: string })[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-medium text-ink-70">{title}</h3>
+      <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+        {rows.map((r) => {
+          const thin = r.applied_count < MIN_RESPONSE_SAMPLE;
+          const pct = rate(r);
+          return (
+            <div key={r.label} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+              <span className="truncate">{r.label}</span>
+              <span className="tabular shrink-0 text-ink-70">
+                {pct != null ? `${Math.round(pct * 100)}%` : "—"} ({r.applied_count}{" "}
+                {r.applied_count === 1 ? "app" : "apps"}
+                {thin ? ", thin" : ""})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Skill demand trendline (minor m30) ────────────────────────────
+
+function SkillDemandSection({
+  isPending,
+  rows,
+}: {
+  isPending: boolean;
+  rows: import("@/hooks/useAnalytics").SkillDemandRow[] | undefined;
+}) {
+  if (isPending) return <SkeletonBlock className="h-24" />;
+
+  if (!rows || rows.length === 0) {
+    return (
+      <EmptyState
+        title="No demand data yet"
+        body="This tracks how often your own profile skills show up in active postings' extracted tech tags — it fills in once your skills overlap with what's actually been recognized in the job board (see the skills list in Settings)."
+      />
+    );
+  }
+
+  const bySkill = new Map<string, { week: string; job_count: number }[]>();
+  for (const r of rows) {
+    if (!bySkill.has(r.skill)) bySkill.set(r.skill, []);
+    bySkill.get(r.skill)!.push({ week: r.week, job_count: r.job_count });
+  }
+
+  return (
+    <div className="space-y-3">
+      {[...bySkill.entries()].map(([skill, points]) => {
+        const total = points.reduce((s, p) => s + p.job_count, 0);
+        return (
+          <div key={skill} className="rounded-app border border-rule bg-raised px-4 py-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-medium capitalize">{skill}</span>
+              <span className="text-xs text-ink-45">
+                {total} active {total === 1 ? "posting" : "postings"} mention this, across{" "}
+                {points.length} {points.length === 1 ? "week" : "weeks"}
+              </span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
