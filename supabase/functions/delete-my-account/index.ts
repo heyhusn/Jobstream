@@ -73,7 +73,19 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const { data: userData, error: userErr } = await callerClient.auth.getUser();
+    // getUser() with no argument reads the client's own session,
+    // which is empty (persistSession is off) — the Authorization
+    // header forwarded above only reaches PostgREST/RPC calls, never
+    // the GoTrue auth client itself. Without the JWT passed
+    // explicitly here, this call failed with "Auth session missing!"
+    // for every caller, real or not — meaning this function has
+    // 401'd unconditionally since it was first deployed. Found while
+    // testing an unrelated rate-limit feature (minor m37); see
+    // CLAUDE.md for the full account of where else this same
+    // omission was hiding.
+    const { data: userData, error: userErr } = await callerClient.auth.getUser(
+      authHeader.replace(/^Bearer\s+/i, "")
+    );
     if (userErr || !userData?.user) {
       return json({ error: "Not authenticated." }, 401);
     }
