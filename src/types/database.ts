@@ -20,6 +20,17 @@ export type TaskType =
   | "agent_run";
 export type RemoteType = "remote" | "hybrid" | "onsite";
 export type RiskBand = "low" | "medium" | "high";
+export type VisaSponsorship = "offered" | "not_offered";
+export type Seniority =
+  | "intern"
+  | "entry"
+  | "mid"
+  | "senior"
+  | "staff"
+  | "lead"
+  | "manager"
+  | "director"
+  | "executive";
 export type CoverLetterTone = "professional" | "warm" | "direct";
 export type InterviewMode = "behavioral" | "technical";
 export type InterviewSessionStatus = "active" | "completed";
@@ -136,6 +147,9 @@ export interface Database {
           repost_count: number;
           posted_at: string | null;
           is_active: boolean;
+          visa_sponsorship: VisaSponsorship | null;
+          seniority: Seniority | null;
+          tech_stack: string[];
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["jobs"]["Row"]> & {

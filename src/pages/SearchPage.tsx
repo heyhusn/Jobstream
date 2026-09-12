@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHybridSearch, type HybridSearchResult, type MatchedVia } from "@/hooks/useHybridSearch";
 import { useSaveToTracker, useTrackedJobIds } from "@/hooks/useApplications";
+import { useCompanyBlocklistIds } from "@/hooks/useCompanyBlocklist";
+import { useNegativeKeywords, matchesNegativeKeywords } from "@/hooks/useNegativeKeywords";
+import {
+  useSavedSearches,
+  useCreateSavedSearch,
+  useDeleteSavedSearch,
+} from "@/hooks/useSavedSearches";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { JobSignalBadges } from "@/components/jobs/JobSignalBadges";
+import { BlockCompanyButton } from "@/components/jobs/BlockCompanyButton";
 import { money, relativeDays } from "@/lib/format";
 import { STAGE_LABEL } from "@/lib/stages";
 import type { RiskBand } from "@/types/database";
@@ -39,11 +48,44 @@ export function SearchPage() {
   const [ranQuery, setRanQuery] = useState<string | null>(null);
   const search = useHybridSearch();
 
-  function runSearch() {
-    const trimmed = query.trim();
+  const { data: blocked } = useCompanyBlocklistIds();
+  const { data: negativeKeywords } = useNegativeKeywords();
+  const { data: savedSearches } = useSavedSearches();
+  const createSaved = useCreateSavedSearch();
+  const deleteSaved = useDeleteSavedSearch();
+
+  const keywordList = useMemo(
+    () => (negativeKeywords ?? []).map((k) => k.keyword),
+    [negativeKeywords]
+  );
+
+  // Minors m17/m18: a blocked company or a negative-keyword hit is
+  // filtered out here rather than server-side — same tradeoff as
+  // useJobAlerts.ts's client-side filter, since neither "a set of
+  // ids to exclude" nor "a set of free-text phrases to exclude"
+  // is something search_jobs_hybrid's RPC signature takes today.
+  const results = useMemo(() => {
+    if (!search.data) return search.data;
+    return search.data.filter(
+      (r) =>
+        !(r.job.company && blocked?.has(r.job.company.id)) &&
+        matchesNegativeKeywords(r.job, keywordList)
+    );
+  }, [search.data, blocked, keywordList]);
+
+  function runSearch(q: string) {
+    const trimmed = q.trim();
     if (!trimmed) return;
+    setQuery(trimmed);
     setRanQuery(trimmed);
     search.mutate(trimmed);
+  }
+
+  function saveCurrentSearch() {
+    if (!ranQuery) return;
+    const name = window.prompt("Name this search", ranQuery);
+    if (!name) return;
+    createSaved.mutate({ name, query_text: ranQuery });
   }
 
   return (
@@ -60,9 +102,9 @@ export function SearchPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          runSearch();
+          runSearch(query);
         }}
-        className="mb-5 flex flex-wrap items-center gap-2"
+        className="mb-3 flex flex-wrap items-center gap-2"
       >
         <input
           value={query}
@@ -73,7 +115,41 @@ export function SearchPage() {
         <Button type="submit" variant="ghost" disabled={search.isPending || !query.trim()}>
           {search.isPending ? "Searching…" : "Search"}
         </Button>
+        {ranQuery && (
+          <button
+            type="button"
+            onClick={saveCurrentSearch}
+            disabled={createSaved.isPending}
+            className="text-xs text-ink-70 underline hover:text-ink"
+          >
+            Save this search
+          </button>
+        )}
       </form>
+
+      {savedSearches && savedSearches.length > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-45">Saved:</span>
+          {savedSearches.map((s) => (
+            <span
+              key={s.id}
+              className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-raised py-1 pl-3 pr-1.5 text-xs"
+            >
+              <button type="button" onClick={() => runSearch(s.query_text)} className="hover:underline">
+                {s.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteSaved.mutate(s.id)}
+                title="Delete this saved search"
+                className="rounded-full px-1 text-ink-45 hover:text-ghost"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {search.isError && (
         <p role="alert" className="mb-4 text-xs text-ghost">
@@ -89,16 +165,16 @@ export function SearchPage() {
         </div>
       )}
 
-      {!search.isPending && ranQuery && search.data && search.data.length === 0 && (
+      {!search.isPending && ranQuery && results && results.length === 0 && (
         <EmptyState
           title="Nothing matched that"
-          body="No active posting shares enough wording or meaning with that query. Try loosening it."
+          body="No active posting shares enough wording or meaning with that query — or everything that did is hidden by a blocked company or negative keyword. Try loosening it."
         />
       )}
 
-      {!search.isPending && search.data && search.data.length > 0 && (
+      {!search.isPending && results && results.length > 0 && (
         <div className="rounded-app border border-rule bg-raised px-4 divide-y divide-rule-soft">
-          {search.data.map((r) => (
+          {results.map((r) => (
             <SearchResultRow key={r.job.id} result={r} />
           ))}
         </div>
@@ -166,6 +242,13 @@ function SearchResultRow({ result }: { result: HybridSearchResult }) {
             </p>
           )}
 
+          <JobSignalBadges
+            jobId={result.job.id}
+            seniority={result.job.seniority}
+            visaSponsorship={result.job.visa_sponsorship}
+            techStack={result.job.tech_stack}
+          />
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a
               href={result.job.apply_url}
@@ -198,6 +281,12 @@ function SearchResultRow({ result }: { result: HybridSearchResult }) {
             >
               {isTracked ? "Saved to tracker" : save.isPending ? "Saving…" : "Save to tracker"}
             </button>
+
+            {result.job.company && (
+              <span className="ml-auto">
+                <BlockCompanyButton companyId={result.job.company.id} />
+              </span>
+            )}
           </div>
         </div>
       )}

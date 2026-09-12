@@ -7,6 +7,8 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { TaskState } from "@/components/ui/TaskState";
 import { Button } from "@/components/ui/Button";
+import { useCompanyBlocklistIds } from "@/hooks/useCompanyBlocklist";
+import { useNegativeKeywords, matchesNegativeKeywords } from "@/hooks/useNegativeKeywords";
 import {
   useNaturalLanguageSearch,
   matchesFilter,
@@ -24,8 +26,24 @@ export function MatchesPage() {
   const [applied, setApplied] = useState<{ filter: SearchFilter; rawQuery: string } | null>(null);
   const search = useNaturalLanguageSearch();
 
+  const { data: blocked } = useCompanyBlocklistIds();
+  const { data: negativeKeywords } = useNegativeKeywords();
+
+  // Minors m17/m18 apply first, unconditionally — a blocked company
+  // or a negative-keyword hit stays hidden regardless of whatever
+  // the NL search filter below does on top of it.
+  const visible = useMemo(() => {
+    if (!matches) return matches;
+    const keywordList = (negativeKeywords ?? []).map((k) => k.keyword);
+    return matches.filter(
+      (m) =>
+        !(m.job.company && blocked?.has(m.job.company.id)) &&
+        matchesNegativeKeywords(m.job, keywordList)
+    );
+  }, [matches, blocked, negativeKeywords]);
+
   const filtered = useMemo(() => {
-    if (!matches || !applied) return matches;
+    if (!visible || !applied) return visible;
     const { filter, rawQuery } = applied;
 
     // A parse the model itself flagged as unreliable falls back to a
@@ -33,7 +51,7 @@ export function MatchesPage() {
     // fields it wasn't confident about would just hide real results.
     if (filter.confidence < LOW_CONFIDENCE) {
       const needle = rawQuery.toLowerCase();
-      return matches.filter((m) =>
+      return visible.filter((m) =>
         [m.job.title, m.job.location, m.job.company?.canonical_name]
           .filter(Boolean)
           .join(" ")
@@ -42,8 +60,8 @@ export function MatchesPage() {
       );
     }
 
-    return matches.filter((m) => matchesFilter(m as MatchListItem, filter));
-  }, [matches, applied]);
+    return visible.filter((m) => matchesFilter(m as MatchListItem, filter));
+  }, [visible, applied]);
 
   const virtualizer = useVirtualizer({
     count: filtered?.length ?? 0,

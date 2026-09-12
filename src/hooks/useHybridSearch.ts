@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { RiskBand } from "@/types/database";
+import type { RiskBand, Seniority, VisaSponsorship } from "@/types/database";
 
 export type MatchedVia = "keyword" | "semantic" | "both";
 
@@ -18,6 +18,9 @@ export interface HybridSearchResult {
     posted_at: string | null;
     first_seen_at: string;
     repost_count: number;
+    visa_sponsorship: VisaSponsorship | null;
+    seniority: Seniority | null;
+    tech_stack: string[];
     company: { id: string; canonical_name: string } | null;
   };
   risk_band: RiskBand | null;

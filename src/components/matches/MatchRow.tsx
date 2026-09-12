@@ -4,6 +4,8 @@ import type { MatchListItem } from "@/hooks/useMatches";
 import { useSaveToTracker, useTrackedJobIds } from "@/hooks/useApplications";
 import { money, relativeDays } from "@/lib/format";
 import { STAGE_LABEL } from "@/lib/stages";
+import { JobSignalBadges } from "@/components/jobs/JobSignalBadges";
+import { BlockCompanyButton } from "@/components/jobs/BlockCompanyButton";
 
 const bandStyles: Record<string, string> = {
   low: "bg-live-wash text-live",
@@ -104,6 +106,13 @@ export function MatchRow({ item }: { item: MatchListItem }) {
             </p>
           )}
 
+          <JobSignalBadges
+            jobId={item.job.id}
+            seniority={item.job.seniority}
+            visaSponsorship={item.job.visa_sponsorship}
+            techStack={item.job.tech_stack}
+          />
+
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a
               href={item.job.apply_url}
@@ -144,6 +153,12 @@ export function MatchRow({ item }: { item: MatchListItem }) {
               <Link to="/tracker" className="text-sm text-ink-45 underline hover:text-ink">
                 Open tracker
               </Link>
+            )}
+
+            {item.job.company && (
+              <span className="ml-auto">
+                <BlockCompanyButton companyId={item.job.company.id} />
+              </span>
             )}
           </div>
 

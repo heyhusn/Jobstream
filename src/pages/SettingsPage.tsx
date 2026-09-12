@@ -5,6 +5,12 @@ import { useDeleteAccount, useExportMyData } from "@/hooks/useDataRights";
 import { useProfile } from "@/hooks/useProfile";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { computeCompleteness } from "@/hooks/useProfileCompleteness";
+import { useBlockedCompanies, useUnblockCompany } from "@/hooks/useCompanyBlocklist";
+import {
+  useNegativeKeywords,
+  useAddNegativeKeyword,
+  useRemoveNegativeKeyword,
+} from "@/hooks/useNegativeKeywords";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -35,6 +41,8 @@ export function SettingsPage() {
       <p className="mt-1 text-sm text-ink-70">Signed in as {user?.email}.</p>
 
       <ProfileSection />
+
+      <SearchFiltersSection />
 
       <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
         <h2 className="text-sm font-semibold">Export your data</h2>
@@ -313,6 +321,113 @@ function ProfileSection() {
         </Button>
         {saved && <span className="text-xs text-live">Saved.</span>}
         {update.isError && <span className="text-xs text-ghost">Couldn't save. Try again.</span>}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Minors m17 (exclude-companies blocklist) and m18 (negative keyword
+ * filters) — the management view for both. The exclusion itself
+ * happens on Matches/Search; this is just where the lists get edited
+ * once "Hide this company" has been clicked a few times and someone
+ * wants to see or undo what's hidden.
+ */
+function SearchFiltersSection() {
+  const { data: blockedCompanies } = useBlockedCompanies();
+  const unblock = useUnblockCompany();
+
+  const { data: keywords } = useNegativeKeywords();
+  const addKeyword = useAddNegativeKeyword();
+  const removeKeyword = useRemoveNegativeKeyword();
+  const [keywordInput, setKeywordInput] = useState("");
+
+  function handleAddKeyword() {
+    const trimmed = keywordInput.trim();
+    if (!trimmed) return;
+    addKeyword.mutate(trimmed, { onSuccess: () => setKeywordInput("") });
+  }
+
+  return (
+    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+      <h2 className="text-sm font-semibold">Search filters</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
+        Companies and keywords hidden from Matches and Search — applied automatically, no need to
+        re-hide them each time.
+      </p>
+
+      <div className="mt-4">
+        <h3 className="text-xs font-medium text-ink-70">Blocked companies</h3>
+        {!blockedCompanies || blockedCompanies.length === 0 ? (
+          <p className="mt-1.5 text-xs text-ink-45">
+            None yet — use "Hide this company" on a job row to add one.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {blockedCompanies.map((c) => (
+              <li key={c.company_id} className="flex items-center justify-between gap-3 text-sm">
+                <span>{c.canonical_name}</span>
+                <button
+                  type="button"
+                  onClick={() => unblock.mutate(c.company_id)}
+                  className="text-xs text-ink-45 underline hover:text-ink"
+                >
+                  Unhide
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-5">
+        <h3 className="text-xs font-medium text-ink-70">Negative keywords</h3>
+        <p className="mt-1 text-xs text-ink-45">
+          Hides any posting whose title or description contains one of these — e.g. "clearance
+          required", "no sponsorship".
+        </p>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="text"
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddKeyword();
+              }
+            }}
+            placeholder="e.g. clearance required"
+            className="flex-1 rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+          />
+          <button
+            type="button"
+            onClick={handleAddKeyword}
+            disabled={addKeyword.isPending || !keywordInput.trim()}
+            className="rounded-app border border-ink px-3 py-1.5 text-sm font-medium hover:bg-ink hover:text-paper disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+        {keywords && keywords.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {keywords.map((k) => (
+              <span
+                key={k.id}
+                className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-paper py-1 pl-2.5 pr-1.5 text-xs text-ink-70"
+              >
+                {k.keyword}
+                <button
+                  type="button"
+                  onClick={() => removeKeyword.mutate(k.id)}
+                  className="rounded-full px-1 text-ink-45 hover:text-ghost"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

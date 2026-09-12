@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import type { MatchSignal, RiskBand } from "@/types/database";
+import type { MatchSignal, RiskBand, Seniority, VisaSponsorship } from "@/types/database";
 
 export interface MatchListItem {
   id: string;
@@ -10,6 +10,7 @@ export interface MatchListItem {
   job: {
     id: string;
     title: string;
+    description: string;
     location: string | null;
     remote_type: string | null;
     salary_min: number | null;
@@ -19,6 +20,9 @@ export interface MatchListItem {
     posted_at: string | null;
     first_seen_at: string;
     repost_count: number;
+    visa_sponsorship: VisaSponsorship | null;
+    seniority: Seniority | null;
+    tech_stack: string[];
     company: { id: string; canonical_name: string } | null;
   };
   ghost: { risk_band: RiskBand; reasons: string[] } | null;
@@ -38,6 +42,7 @@ interface RawMatchRow {
   job: {
     id: string;
     title: string;
+    description: string;
     location: string | null;
     remote_type: string | null;
     salary_min: number | null;
@@ -47,6 +52,9 @@ interface RawMatchRow {
     posted_at: string | null;
     first_seen_at: string;
     repost_count: number;
+    visa_sponsorship: VisaSponsorship | null;
+    seniority: Seniority | null;
+    tech_stack: string[];
     company: { id: string; canonical_name: string } | null;
     ghost_signals: { risk_band: RiskBand; reasons: string[] }[] | null;
   };
@@ -64,8 +72,9 @@ export function useMatches() {
         .select(
           `id, score, score_breakdown,
            job:jobs (
-             id, title, location, remote_type, salary_min, salary_max,
+             id, title, description, location, remote_type, salary_min, salary_max,
              salary_currency, apply_url, posted_at, first_seen_at, repost_count,
+             visa_sponsorship, seniority, tech_stack,
              company:companies ( id, canonical_name ),
              ghost_signals ( risk_band, reasons )
            )`
