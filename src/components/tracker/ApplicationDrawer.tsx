@@ -11,6 +11,8 @@ import { ResumeOptimizerPanel } from "./ResumeOptimizerPanel";
 import { AssistedApplyPanel } from "./AssistedApplyPanel";
 import { InterviewPrepPanel } from "./InterviewPrepPanel";
 import { AgentOrchestrationPanel } from "./AgentOrchestrationPanel";
+import { InterviewSchedulePanel } from "./InterviewSchedulePanel";
+import { FollowUpEmailPanel } from "./FollowUpEmailPanel";
 
 const NOTES_DEBOUNCE_MS = 700;
 
@@ -281,6 +283,8 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
             )}
           </div>
 
+          <InterviewSchedulePanel item={item} onPatch={patch} />
+          <FollowUpEmailPanel item={item} />
           <ResumeOptimizerPanel item={item} />
           <AssistedApplyPanel item={item} />
           <AgentOrchestrationPanel item={item} />

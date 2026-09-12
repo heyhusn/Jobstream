@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ApplicationStage } from "@/types/database";
-import { STAGES, STAGE_IDS, STAGE_LABEL, isStageId } from "@/lib/stages";
+import { STAGE_IDS, STAGE_LABEL, isStageId } from "@/lib/stages";
 import {
   applicationsKey,
   flattenBoard,
@@ -31,6 +31,7 @@ import {
 import { moveToStage, reorderWithin } from "@/lib/board";
 import { useAuth } from "@/hooks/useAuth";
 import { useNow } from "@/hooks/useNow";
+import { useEffectiveStages } from "@/hooks/useKanbanStagePrefs";
 import { TrackerColumn } from "./TrackerColumn";
 import { CardBody } from "./ApplicationCard";
 import { ApplicationDrawer } from "./ApplicationDrawer";
@@ -73,6 +74,11 @@ export function TrackerBoard({ applications, scores }: Props) {
   const { user } = useAuth();
   const reorder = useReorderApplications();
   const now = useNow();
+  // Minor m19: customized labels/order/visibility layered over the
+  // fixed six stages — the drag-and-drop mechanics below still key
+  // off STAGE_IDS/STAGE_LABEL untouched, since only what's rendered
+  // (not the underlying stage values) is customizable.
+  const effectiveStages = useEffectiveStages();
 
   // Positions a finished drag is still saving, by application id.
   //
@@ -259,20 +265,22 @@ export function TrackerBoard({ applications, scores }: Props) {
       >
         <div className="-mx-6 overflow-x-auto px-6 pb-4">
           <div className="flex min-h-[420px] items-stretch gap-3">
-            {STAGES.map((s) => (
-              <TrackerColumn
-                key={s.id}
-                stage={s.id}
-                label={s.label}
-                terminal={s.terminal}
-                emptyHint={s.emptyHint}
-                items={board[s.id]}
-                scores={scores}
-                now={now}
-                onOpen={setOpenId}
-                isDragging={activeId != null}
-              />
-            ))}
+            {effectiveStages
+              .filter((s) => !s.hidden)
+              .map((s) => (
+                <TrackerColumn
+                  key={s.id}
+                  stage={s.id}
+                  label={s.label}
+                  terminal={s.terminal}
+                  emptyHint={s.emptyHint}
+                  items={board[s.id]}
+                  scores={scores}
+                  now={now}
+                  onOpen={setOpenId}
+                  isDragging={activeId != null}
+                />
+              ))}
           </div>
         </div>
 

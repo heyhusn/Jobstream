@@ -202,6 +202,8 @@ export interface Database {
           notes: string | null;
           applied_at: string | null;
           next_action_at: string | null;
+          interview_at: string | null;
+          interview_timezone: string | null;
           created_at: string;
           updated_at: string;
         };

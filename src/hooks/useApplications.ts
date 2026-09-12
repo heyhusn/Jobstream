@@ -25,6 +25,8 @@ export interface ApplicationItem {
   notes: string | null;
   applied_at: string | null;
   next_action_at: string | null;
+  interview_at: string | null;
+  interview_timezone: string | null;
   resume_version_id: string | null;
   created_at: string;
   updated_at: string;
@@ -76,6 +78,7 @@ interface RawApplicationRow extends Omit<ApplicationItem, "job"> {
 
 const SELECT = `
   id, stage, stage_order, notes, applied_at, next_action_at,
+  interview_at, interview_timezone,
   resume_version_id, created_at, updated_at,
   job:jobs (
     id, title, location, remote_type, salary_min, salary_max,
@@ -221,7 +224,14 @@ export function useReorderApplications() {
 export type ApplicationPatch = Partial<
   Pick<
     ApplicationItem,
-    "stage" | "stage_order" | "notes" | "applied_at" | "next_action_at" | "resume_version_id"
+    | "stage"
+    | "stage_order"
+    | "notes"
+    | "applied_at"
+    | "next_action_at"
+    | "interview_at"
+    | "interview_timezone"
+    | "resume_version_id"
   >
 >;
 

@@ -1,9 +1,15 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   useCompanyIntelligence,
   useCompanyOpenRoles,
   type CompanyOpenRole,
 } from "@/hooks/useCompanyIntelligence";
+import {
+  useCompanyContacts,
+  useAddCompanyContact,
+  useDeleteCompanyContact,
+} from "@/hooks/useCompanyContacts";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import type { RiskBand } from "@/types/database";
@@ -161,7 +167,86 @@ export function CompanyPage() {
           </div>
         )}
       </section>
+
+      <CompanyContactsSection companyId={companyId} />
     </div>
+  );
+}
+
+/**
+ * Minor m24: your own notes on a company's contacts/recruiters,
+ * persisting across every application to them — not tied to one
+ * specific application the way the tracker drawer's notes field is.
+ */
+function CompanyContactsSection({ companyId }: { companyId: string | undefined }) {
+  const { data: contacts } = useCompanyContacts(companyId);
+  const addContact = useAddCompanyContact(companyId);
+  const deleteContact = useDeleteCompanyContact(companyId);
+
+  const [contactName, setContactName] = useState("");
+  const [note, setNote] = useState("");
+
+  function handleAdd() {
+    if (!note.trim()) return;
+    addContact.mutate(
+      { contactName: contactName.trim() || null, note: note.trim() },
+      { onSuccess: () => { setContactName(""); setNote(""); } }
+    );
+  }
+
+  return (
+    <section className="mt-6">
+      <h2 className="mb-3 text-sm font-semibold">Your notes on this company</h2>
+      <div className="rounded-app border border-rule bg-raised px-4 py-4">
+        <div className="flex flex-wrap gap-2">
+          <input
+            type="text"
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            placeholder="Contact name (optional)"
+            className="w-48 rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+          />
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
+            }}
+            placeholder="e.g. Sarah in recruiting is great, ping her directly next time"
+            className="min-w-[240px] flex-1 rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+          />
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={addContact.isPending || !note.trim()}
+            className="rounded-app border border-ink px-3 py-2 text-sm font-medium hover:bg-ink hover:text-paper disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+
+        {contacts && contacts.length > 0 && (
+          <ul className="mt-4 space-y-2.5 border-t border-rule-soft pt-3">
+            {contacts.map((c) => (
+              <li key={c.id} className="flex items-start justify-between gap-3 text-sm">
+                <div>
+                  {c.contact_name && <p className="font-medium">{c.contact_name}</p>}
+                  <p className="text-ink-70">{c.note}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => deleteContact.mutate(c.id)}
+                  className="shrink-0 text-xs text-ink-45 hover:text-ghost"
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 
