@@ -47,6 +47,8 @@ const BillingPage = lazy(() =>
 const NotFoundPage = lazy(() =>
   import("@/pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage }))
 );
+const DemoPage = lazy(() => import("@/pages/DemoPage").then((m) => ({ default: m.DemoPage })));
+const StatusPage = lazy(() => import("@/pages/StatusPage").then((m) => ({ default: m.StatusPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +81,8 @@ export default function App() {
                 <Route path="/" element={<Navigate to="/matches" replace />} />
                 <Route path="/sign-in" element={<SignInPage />} />
                 <Route path="/sign-up" element={<SignUpPage />} />
+                <Route path="/demo" element={<DemoPage />} />
+                <Route path="/status" element={<StatusPage />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route path="/onboarding" element={<OnboardingPage />} />

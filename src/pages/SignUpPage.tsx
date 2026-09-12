@@ -1,10 +1,15 @@
 import { useState, type FormEvent } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/Button";
 
 export function SignUpPage() {
   const { session, signUpWithPassword, signInWithGoogle } = useAuth();
+  const [searchParams] = useSearchParams();
+  // Minor m39: a referral link is just /sign-up?ref=CODE — carried
+  // through to signUp() as user metadata, never written by the
+  // client directly (see handle_new_user(), migration 0030).
+  const referralCode = searchParams.get("ref");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +23,7 @@ export function SignUpPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { error } = await signUpWithPassword(email, password, fullName);
+    const { error } = await signUpWithPassword(email, password, fullName, referralCode);
     setSubmitting(false);
     if (error) setError(error);
     else setCheckEmail(true);
@@ -46,6 +51,9 @@ export function SignUpPage() {
         </Link>
         <h1 className="mt-8 text-2xl font-semibold">Start with the nine, not the fourteen hundred</h1>
         <p className="mt-1.5 text-sm text-ink-70">Free to start. No card.</p>
+        {referralCode && (
+          <p className="mt-2 text-xs text-live">You were referred by a friend.</p>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-7 space-y-3">
           <div>

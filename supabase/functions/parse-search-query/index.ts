@@ -17,6 +17,18 @@
 // DeepSeek quota; there's no per-call credit charge because parsing
 // a short query is cheap and this is a Free-tier feature per the
 // roadmap's pricing table.
+//
+// Minor m37: this is one of the two functions in this app that are
+// both JWT-gated AND not credit-charged — every other AI feature is
+// already self-limiting via the credit ledger, but a signed-in user
+// could otherwise call this one an unbounded number of times for
+// free. `check_rate_limit` (migration 0030) is a small per-user
+// sliding-window counter; a caller-scoped client (anon key + the
+// caller's own bearer token) is created just to identify who's
+// calling and to make that one RPC call — this function still never
+// touches the credit ledger or writes anything else.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +76,11 @@ Deno.serve(async (req) => {
     return json({ error: "POST only." }, 405);
   }
 
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return json({ error: "Not authenticated." }, 401);
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const query = typeof body?.query === "string" ? body.query.trim() : "";
@@ -72,6 +89,30 @@ Deno.serve(async (req) => {
     }
     if (query.length > MAX_QUERY_CHARS) {
       return json({ error: `Query is too long (max ${MAX_QUERY_CHARS} characters).` }, 400);
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (supabaseUrl && anonKey) {
+      const supabase = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      // See hybrid-search's identical comment: getUser() needs the
+      // JWT passed explicitly — the forwarded Authorization header
+      // alone doesn't reach the GoTrue auth client.
+      const { data: userData } = await supabase.auth.getUser(authHeader.replace(/^Bearer\s+/i, ""));
+      if (userData?.user) {
+        const { data: allowed, error: rateLimitErr } = await supabase.rpc("check_rate_limit", {
+          p_user_id: userData.user.id,
+          p_bucket: "parse-search-query",
+          p_limit: 30,
+          p_window_seconds: 300,
+        });
+        if (!rateLimitErr && allowed === false) {
+          return json({ error: "Too many searches — try again in a few minutes." }, 429);
+        }
+      }
     }
 
     const key = Deno.env.get("DEEPSEEK_API_KEY");

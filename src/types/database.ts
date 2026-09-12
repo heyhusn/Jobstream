@@ -78,6 +78,7 @@ export interface Database {
           salary_currency: string;
           github_url: string | null;
           portfolio_url: string | null;
+          referral_code: string | null;
           onboarded_at: string | null;
           created_at: string;
           updated_at: string;

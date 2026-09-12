@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useCreditBalance } from "@/hooks/useCreditBalance";
 import { useCreditUsage } from "@/hooks/useAnalytics";
+import { useReferralCode, useMyReferrals } from "@/hooks/useReferrals";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 
@@ -90,6 +92,64 @@ export function BillingPage() {
           </div>
         )}
       </section>
+
+      <ReferralSection />
     </div>
+  );
+}
+
+/**
+ * Minor m39: the reward is granted server-side once the referred
+ * person actually finishes onboarding (see grant_referral_reward(),
+ * migration 0030) — not at signup, which would trivially pay out for
+ * a bare email with nobody behind it.
+ */
+function ReferralSection() {
+  const { data: code } = useReferralCode();
+  const { data: referrals } = useMyReferrals();
+  const [copied, setCopied] = useState(false);
+
+  const link = code ? `${window.location.origin}/sign-up?ref=${code}` : null;
+  const rewardedCount = (referrals ?? []).filter((r) => r.reward_granted).length;
+
+  async function copyLink() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard can be refused outright; nothing else to fall back to.
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+      <h2 className="text-sm font-semibold">Refer a friend</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
+        Share your link — once someone signs up through it and finishes onboarding, you get bonus
+        credits.
+      </p>
+      {link && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <code className="flex-1 truncate rounded-app border border-rule bg-paper px-3 py-2 text-xs">
+            {link}
+          </code>
+          <button
+            type="button"
+            onClick={copyLink}
+            className="rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      )}
+      {referrals && referrals.length > 0 && (
+        <p className="mt-3 text-xs text-ink-45">
+          {referrals.length} {referrals.length === 1 ? "signup" : "signups"} via your link,{" "}
+          {rewardedCount} rewarded so far.
+        </p>
+      )}
+    </section>
   );
 }

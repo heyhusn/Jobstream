@@ -92,6 +92,32 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Minor m37: same free-tier-but-JWT-gated exposure as
+    // parse-search-query — see that function's header comment for
+    // why this class of endpoint needed a rate limit that the credit
+    // ledger doesn't provide for it.
+    // `getUser()` with no argument reads from the client's own
+    // session, which is empty (persistSession is off) — the
+    // Authorization header forwarded above only flows into
+    // PostgREST/RPC calls, never into the GoTrue auth client. The
+    // JWT has to be handed to getUser() explicitly to actually
+    // validate the caller. (Found while testing this rate limit:
+    // the identical omission in delete-my-account and admin-action
+    // meant both silently 401'd for every real caller — see CLAUDE.md.)
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: userData } = await supabase.auth.getUser(bearerToken);
+    if (userData?.user) {
+      const { data: allowed, error: rateLimitErr } = await supabase.rpc("check_rate_limit", {
+        p_user_id: userData.user.id,
+        p_bucket: "hybrid-search",
+        p_limit: 30,
+        p_window_seconds: 300,
+      });
+      if (!rateLimitErr && allowed === false) {
+        return json({ error: "Too many searches — try again in a few minutes." }, 429);
+      }
+    }
+
     // Same on-device model, same mean-pool/normalize settings
     // generate-matches uses to build jobs.embedding, so the query
     // vector lives in the same space as what it's being compared to.

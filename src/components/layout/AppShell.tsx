@@ -4,12 +4,14 @@ import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useAdmin";
 import { useTheme, type ThemeChoice } from "@/hooks/useTheme";
+import { useFeatureFlag } from "@/hooks/useFeatureFlags";
+import { useSystemStatus } from "@/hooks/useSystemStatus";
 import { CreditChip } from "@/components/ui/CreditChip";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 
 const links = [
   { to: "/matches", label: "Matches" },
-  { to: "/search", label: "Search" },
+  { to: "/search", label: "Search", flag: "search_page_enabled" },
   { to: "/resumes", label: "Resumes" },
   { to: "/tracker", label: "Tracker" },
   { to: "/companies", label: "Companies" },
@@ -48,16 +50,40 @@ function ThemeToggle() {
   );
 }
 
+/** Minor m40: shown app-wide whenever the operator has flagged anything other than "operational". */
+function StatusBanner() {
+  const { data } = useSystemStatus();
+  if (!data || data.status === "operational") return null;
+
+  return (
+    <div
+      className={clsx(
+        "px-6 py-2 text-center text-sm",
+        data.status === "outage" ? "bg-ghost text-paper" : "bg-rule text-ink"
+      )}
+    >
+      {data.status === "outage" ? "Outage" : "Degraded performance"}
+      {data.message ? ` — ${data.message}` : ""}
+    </div>
+  );
+}
+
 export function AppShell() {
   const { signOut } = useAuth();
   // Server-side RPCs are the real gate (see is_admin() in
   // 0020_admin_console.sql) — this only decides whether to show a
   // link that would otherwise 403 for everyone else.
   const { data: isAdmin } = useIsAdmin();
-  const visibleLinks = isAdmin ? [...links, { to: "/admin", label: "Admin" }] : links;
+  // Minor m36: a flagged-off link disappears from nav, but the route
+  // itself isn't removed — see the note on App.tsx for why this is
+  // presentation-only, same scoping as m19's stage customizer.
+  const searchEnabled = useFeatureFlag("search_page_enabled");
+  const baseLinks = searchEnabled ? links : links.filter((l) => l.to !== "/search");
+  const visibleLinks = isAdmin ? [...baseLinks, { to: "/admin", label: "Admin" }] : baseLinks;
 
   return (
     <div className="min-h-screen bg-paper">
+      <StatusBanner />
       <header className="sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur-sm">
         <div className="mx-auto flex h-[62px] max-w-[1180px] items-center gap-6 px-6">
           <span className="mr-auto font-display text-lg font-bold tracking-tight">

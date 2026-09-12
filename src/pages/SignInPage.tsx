@@ -91,6 +91,11 @@ export function SignInPage() {
             Create an account
           </Link>
         </p>
+        <p className="mt-2 text-center text-sm text-ink-70">
+          <Link to="/demo" className="underline underline-offset-2">
+            See a demo first
+          </Link>
+        </p>
       </div>
     </div>
   );

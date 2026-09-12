@@ -13,7 +13,12 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpWithPassword: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
+  signUpWithPassword: (
+    email: string,
+    password: string,
+    fullName: string,
+    referralCode?: string | null
+  ) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -46,11 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  async function signUpWithPassword(email: string, password: string, fullName: string) {
+  async function signUpWithPassword(
+    email: string,
+    password: string,
+    fullName: string,
+    referralCode?: string | null
+  ) {
+    // `handle_new_user()` (0001, extended by 0030 for the referral
+    // programme, minor m39) reads both keys straight off
+    // raw_user_meta_data server-side — this is the only channel a
+    // referral code travels through, never a separate client write.
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, referral_code: referralCode || undefined } },
     });
     return { error: error?.message ?? null };
   }
