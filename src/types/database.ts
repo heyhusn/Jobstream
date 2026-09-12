@@ -65,6 +65,8 @@ export interface Database {
           remote_preference: RemoteType | "no_preference" | null;
           salary_floor: number | null;
           salary_currency: string;
+          github_url: string | null;
+          portfolio_url: string | null;
           onboarded_at: string | null;
           created_at: string;
           updated_at: string;

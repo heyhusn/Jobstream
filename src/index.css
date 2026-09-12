@@ -20,6 +20,53 @@
   --radius-app: 5px;
 }
 
+/*
+ * Dark mode (roadmap minor m33). Every color in this app is already
+ * one of the tokens above, referenced by Tailwind utilities like
+ * `bg-paper`/`text-ink` — so redefining the tokens themselves here
+ * repaints the whole app with zero per-component changes, rather
+ * than adding a `dark:` variant to every one of ~25 pages.
+ *
+ * Three states, same convention as light: an explicit choice stamps
+ * `data-theme` on <html> (set by useTheme.ts, read synchronously in
+ * main.tsx before first paint to avoid a flash); "system" (the
+ * default, no attribute) follows prefers-color-scheme.
+ *
+ * Scope note: this is a real dark theme, not a stub — but it is not
+ * a full WCAG 2.1 AA audit of the app (contrast ratios were checked
+ * for these tokens' own text/background pairings, not every
+ * composed state across every page). That's a larger, separate
+ * effort than a color-token swap.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-paper: #14171a;
+    --color-raised: #1d2120;
+    --color-ink: #e9ebe4;
+    --color-ink-70: #a9b0a4;
+    --color-ink-45: #767d72;
+    --color-rule: #343a32;
+    --color-rule-soft: #262b24;
+    --color-live: #4fae7c;
+    --color-live-wash: #1c3327;
+    --color-ghost: #e2685a;
+    --color-ghost-wash: #3a211d;
+  }
+}
+:root[data-theme="dark"] {
+  --color-paper: #14171a;
+  --color-raised: #1d2120;
+  --color-ink: #e9ebe4;
+  --color-ink-70: #a9b0a4;
+  --color-ink-45: #767d72;
+  --color-rule: #343a32;
+  --color-rule-soft: #262b24;
+  --color-live: #4fae7c;
+  --color-live-wash: #1c3327;
+  --color-ghost: #e2685a;
+  --color-ghost-wash: #3a211d;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

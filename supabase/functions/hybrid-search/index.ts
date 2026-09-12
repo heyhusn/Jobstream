@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       .from("jobs")
       .select(
         `id, title, description, location, remote_type, salary_min, salary_max,
-         salary_currency, apply_url, posted_at,
+         salary_currency, apply_url, posted_at, first_seen_at, repost_count,
          company:companies ( id, canonical_name ),
          ghost_signals ( risk_band )`
       )
@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
             salary_currency: job.salary_currency,
             apply_url: job.apply_url,
             posted_at: job.posted_at,
+            first_seen_at: job.first_seen_at,
+            repost_count: job.repost_count,
             company: job.company,
           },
           risk_band: job.ghost_signals?.[0]?.risk_band ?? null,

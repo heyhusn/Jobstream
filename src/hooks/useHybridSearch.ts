@@ -16,6 +16,8 @@ export interface HybridSearchResult {
     salary_currency: string;
     apply_url: string;
     posted_at: string | null;
+    first_seen_at: string;
+    repost_count: number;
     company: { id: string; canonical_name: string } | null;
   };
   risk_band: RiskBand | null;

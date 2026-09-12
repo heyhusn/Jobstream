@@ -4,7 +4,8 @@ import { useHybridSearch, type HybridSearchResult, type MatchedVia } from "@/hoo
 import { useSaveToTracker, useTrackedJobIds } from "@/hooks/useApplications";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { money } from "@/lib/format";
+import { money, relativeDays } from "@/lib/format";
+import { STAGE_LABEL } from "@/lib/stages";
 import type { RiskBand } from "@/types/database";
 
 const bandStyles: Record<RiskBand, string> = {
@@ -118,6 +119,7 @@ function SearchResultRow({ result }: { result: HybridSearchResult }) {
   const { data: tracked } = useTrackedJobIds();
   const save = useSaveToTracker();
   const isTracked = tracked?.has(result.job.id) ?? false;
+  const trackedStage = tracked?.get(result.job.id);
 
   return (
     <div>
@@ -136,11 +138,18 @@ function SearchResultRow({ result }: { result: HybridSearchResult }) {
                 {bandLabel[result.risk_band]}
               </span>
             )}
+            {result.job.repost_count > 0 && (
+              <span className="shrink-0 rounded-full bg-rule px-2 py-0.5 text-xs font-medium text-ink-70">
+                Reposted {result.job.repost_count}×
+              </span>
+            )}
           </div>
           <div className="mt-0.5 truncate text-sm text-ink-45">
             {result.job.company?.canonical_name ?? "Unknown company"}
             {result.job.location ? ` — ${result.job.location}` : ""} —{" "}
             {money(result.job.salary_min, result.job.salary_max, result.job.salary_currency)}
+            {" — "}
+            First seen {relativeDays(result.job.first_seen_at, Date.now())}
           </div>
         </div>
         <span className="shrink-0 text-xs text-ink-45">{matchedViaLabel[result.matched_via]}</span>
@@ -149,6 +158,13 @@ function SearchResultRow({ result }: { result: HybridSearchResult }) {
       {open && (
         <div className="mb-4 rounded-app border border-rule-soft bg-raised px-4 py-3">
           <p className="text-sm leading-relaxed text-ink-70">{result.job.description}</p>
+
+          {trackedStage && (
+            <p className="mt-3 rounded-app border border-live/30 bg-live-wash px-3 py-2 text-xs text-live">
+              You already have this tracked as <strong>{STAGE_LABEL[trackedStage]}</strong> — check
+              the tracker before applying again.
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <a

@@ -1,0 +1,18 @@
+{
+  "name": "JobSpy",
+  "short_name": "JobSpy",
+  "description": "AI-assisted job search: resume parsing, explainable matches, ghost-job detection, and an application tracker.",
+  "start_url": "/matches",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#E9EBE4",
+  "theme_color": "#E9EBE4",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

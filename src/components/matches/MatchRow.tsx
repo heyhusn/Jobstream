@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { MatchListItem } from "@/hooks/useMatches";
 import { useSaveToTracker, useTrackedJobIds } from "@/hooks/useApplications";
-import { money } from "@/lib/format";
+import { money, relativeDays } from "@/lib/format";
+import { STAGE_LABEL } from "@/lib/stages";
 
 const bandStyles: Record<string, string> = {
   low: "bg-live-wash text-live",
@@ -21,6 +22,7 @@ export function MatchRow({ item }: { item: MatchListItem }) {
   const save = useSaveToTracker();
 
   const isTracked = tracked?.has(item.job.id) ?? false;
+  const trackedStage = tracked?.get(item.job.id);
 
   return (
     <div className="border-b border-rule-soft last:border-b-0">
@@ -39,11 +41,18 @@ export function MatchRow({ item }: { item: MatchListItem }) {
                 {bandLabel[item.ghost.risk_band]}
               </span>
             )}
+            {item.job.repost_count > 0 && (
+              <span className="shrink-0 rounded-full bg-rule px-2 py-0.5 text-xs font-medium text-ink-70">
+                Reposted {item.job.repost_count}×
+              </span>
+            )}
           </div>
           <div className="mt-0.5 truncate text-sm text-ink-45">
             {item.job.company?.canonical_name ?? "Unknown company"}
             {item.job.location ? ` — ${item.job.location}` : ""} —{" "}
             {money(item.job.salary_min, item.job.salary_max, item.job.salary_currency)}
+            {" — "}
+            First seen {relativeDays(item.job.first_seen_at, Date.now())}
           </div>
         </div>
 
@@ -86,6 +95,13 @@ export function MatchRow({ item }: { item: MatchListItem }) {
                 ))}
               </ul>
             </div>
+          )}
+
+          {trackedStage && (
+            <p className="mt-3 rounded-app border border-live/30 bg-live-wash px-3 py-2 text-xs text-live">
+              You already have this tracked as <strong>{STAGE_LABEL[trackedStage]}</strong> — check
+              the tracker before applying again.
+            </p>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">

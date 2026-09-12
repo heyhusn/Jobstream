@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeleteAccount, useExportMyData } from "@/hooks/useDataRights";
+import { useProfile } from "@/hooks/useProfile";
+import { useUpdateProfile } from "@/hooks/useUpdateProfile";
+import { computeCompleteness } from "@/hooks/useProfileCompleteness";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -9,9 +12,7 @@ import { Button } from "@/components/ui/Button";
  * holds about you, or delete your account outright. Both are real —
  * export pulls from `export_my_data()`, deletion calls a real Edge
  * Function that cascades through every user-owned table — not
- * placeholders. Profile editing/resume versions (the rest of what
- * this page's old stub promised) aren't built yet; onboarding is
- * still the only way to edit the profile.
+ * placeholders.
  */
 export function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -32,6 +33,8 @@ export function SettingsPage() {
     <div className="mx-auto max-w-xl">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <p className="mt-1 text-sm text-ink-70">Signed in as {user?.email}.</p>
+
+      <ProfileSection />
 
       <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
         <h2 className="text-sm font-semibold">Export your data</h2>
@@ -115,5 +118,202 @@ export function SettingsPage() {
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * Minors m05 (GitHub/portfolio link) and m06 (completeness meter),
+ * plus the first post-onboarding edit path for the rest of the
+ * profile — without it, m05/m06 would have nowhere for their fields
+ * to actually be edited.
+ */
+function ProfileSection() {
+  const { data: profile, isPending } = useProfile();
+  const update = useUpdateProfile();
+
+  const [skillsText, setSkillsText] = useState("");
+  const [years, setYears] = useState("");
+  const [remotePreference, setRemotePreference] = useState<
+    "remote" | "hybrid" | "onsite" | "no_preference"
+  >("no_preference");
+  const [salaryFloor, setSalaryFloor] = useState("");
+  const [salaryCurrency, setSalaryCurrency] = useState("USD");
+  const [workAuth, setWorkAuth] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    const skills = Array.isArray(profile.parsed?.skills) ? (profile.parsed.skills as string[]) : [];
+    setSkillsText(skills.join(", "));
+    setYears(profile.years_experience != null ? String(profile.years_experience) : "");
+    setRemotePreference((profile.remote_preference as typeof remotePreference) ?? "no_preference");
+    setSalaryFloor(profile.salary_floor != null ? String(profile.salary_floor) : "");
+    setSalaryCurrency(profile.salary_currency ?? "USD");
+    setWorkAuth(profile.work_authorisation ?? "");
+    setGithubUrl(profile.github_url ?? "");
+    setPortfolioUrl(profile.portfolio_url ?? "");
+  }, [profile]);
+
+  const { percent, checks } = computeCompleteness(profile);
+
+  function handleSave() {
+    const skills = skillsText.split(",").map((s) => s.trim()).filter(Boolean);
+    update.mutate(
+      {
+        skills,
+        years_experience: years ? Number(years) : null,
+        remote_preference: remotePreference,
+        salary_floor: salaryFloor ? Number(salaryFloor) : null,
+        salary_currency: salaryCurrency,
+        work_authorisation: workAuth.trim() || null,
+        github_url: githubUrl.trim() || null,
+        portfolio_url: portfolioUrl.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        },
+      }
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="mt-8 h-64 animate-pulse rounded-app bg-raised" aria-hidden="true" />
+    );
+  }
+
+  return (
+    <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold">Profile</h2>
+        <span className="tabular text-xs font-medium text-ink-70">{percent}% complete</span>
+      </div>
+
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-rule">
+        <span
+          className="block h-full rounded-full bg-live transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+
+      {checks.some((c) => !c.done) && (
+        <ul className="mt-2.5 space-y-1 text-xs text-ink-70">
+          {checks
+            .filter((c) => !c.done)
+            .map((c) => (
+              <li key={c.label}>• {c.label}</li>
+            ))}
+        </ul>
+      )}
+
+      <div className="mt-4 space-y-3.5">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-70">Skills</label>
+          <textarea
+            rows={2}
+            value={skillsText}
+            onChange={(e) => setSkillsText(e.target.value)}
+            className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            placeholder="python, fastapi, postgresql…"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">Years of experience</label>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={years}
+              onChange={(e) => setYears(e.target.value)}
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">Work arrangement</label>
+            <select
+              value={remotePreference}
+              onChange={(e) => setRemotePreference(e.target.value as typeof remotePreference)}
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            >
+              <option value="no_preference">No strong preference</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="onsite">Onsite</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">Salary floor</label>
+            <input
+              type="number"
+              min={0}
+              value={salaryFloor}
+              onChange={(e) => setSalaryFloor(e.target.value)}
+              placeholder="e.g. 90000"
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">Currency</label>
+            <input
+              type="text"
+              value={salaryCurrency}
+              onChange={(e) => setSalaryCurrency(e.target.value.toUpperCase().slice(0, 3))}
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-70">Work authorisation</label>
+          <input
+            type="text"
+            value={workAuth}
+            onChange={(e) => setWorkAuth(e.target.value)}
+            placeholder="e.g. US citizen, needs sponsorship, EU work permit…"
+            className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">GitHub</label>
+            <input
+              type="url"
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              placeholder="https://github.com/you"
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink-70">Portfolio</label>
+            <input
+              type="url"
+              value={portfolioUrl}
+              onChange={(e) => setPortfolioUrl(e.target.value)}
+              placeholder="https://you.dev"
+              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <Button onClick={handleSave} disabled={update.isPending}>
+          {update.isPending ? "Saving…" : "Save profile"}
+        </Button>
+        {saved && <span className="text-xs text-live">Saved.</span>}
+        {update.isError && <span className="text-xs text-ghost">Couldn't save. Try again.</span>}
+      </div>
+    </section>
   );
 }

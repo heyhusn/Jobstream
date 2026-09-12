@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useAdmin";
+import { useTheme, type ThemeChoice } from "@/hooks/useTheme";
 import { CreditChip } from "@/components/ui/CreditChip";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 
@@ -24,6 +25,25 @@ function PageFallback() {
     <div className="grid min-h-[50vh] place-items-center" aria-hidden="true">
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-rule border-t-ink-70" />
     </div>
+  );
+}
+
+const THEME_CYCLE: ThemeChoice[] = ["system", "light", "dark"];
+const THEME_LABEL: Record<ThemeChoice, string> = { system: "Auto", light: "Light", dark: "Dark" };
+
+/** Minor m33: a three-way cycle, not a binary switch — "system" stays the default. */
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length])}
+      title="Theme: light, dark, or match your system"
+      className="rounded-app border border-rule px-2.5 py-1.5 text-xs font-medium text-ink-70 transition-colors hover:border-ink hover:text-ink"
+    >
+      {THEME_LABEL[theme]}
+    </button>
   );
 }
 
@@ -59,6 +79,7 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
+          <ThemeToggle />
           <NotificationBell />
           <CreditChip />
           <button

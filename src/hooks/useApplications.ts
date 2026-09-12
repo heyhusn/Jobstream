@@ -288,9 +288,12 @@ export function useDeleteApplication() {
 }
 
 /**
- * Just the job ids already on the board. Matches uses this to show
- * "Saved" instead of "Save to tracker" without pulling the whole
- * tracker payload into a page that doesn't render it.
+ * Job ids already on the board, mapped to their current stage.
+ * Matches/Search use `.has()` (a Map supports the same call as the
+ * Set this used to be) to show "Saved" instead of "Save to tracker";
+ * the stage itself backs the roadmap's minor m11 — an explicit
+ * "you applied here before" warning at the moment someone is about
+ * to click through to apply again, not just a disabled save button.
  */
 export function useTrackedJobIds() {
   const { user } = useAuth();
@@ -298,13 +301,13 @@ export function useTrackedJobIds() {
   return useQuery({
     queryKey: ["tracked-job-ids", user?.id],
     enabled: !!user,
-    queryFn: async (): Promise<Set<string>> => {
+    queryFn: async (): Promise<Map<string, ApplicationStage>> => {
       const { data, error } = await supabase
         .from("applications")
-        .select("job_id")
+        .select("job_id, stage")
         .eq("user_id", user!.id);
       if (error) throw error;
-      return new Set((data ?? []).map((r) => r.job_id));
+      return new Map((data ?? []).map((r) => [r.job_id, r.stage as ApplicationStage]));
     },
   });
 }

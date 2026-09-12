@@ -17,6 +17,8 @@ export interface MatchListItem {
     salary_currency: string;
     apply_url: string;
     posted_at: string | null;
+    first_seen_at: string;
+    repost_count: number;
     company: { id: string; canonical_name: string } | null;
   };
   ghost: { risk_band: RiskBand; reasons: string[] } | null;
@@ -43,6 +45,8 @@ interface RawMatchRow {
     salary_currency: string;
     apply_url: string;
     posted_at: string | null;
+    first_seen_at: string;
+    repost_count: number;
     company: { id: string; canonical_name: string } | null;
     ghost_signals: { risk_band: RiskBand; reasons: string[] }[] | null;
   };
@@ -61,7 +65,7 @@ export function useMatches() {
           `id, score, score_breakdown,
            job:jobs (
              id, title, location, remote_type, salary_min, salary_max,
-             salary_currency, apply_url, posted_at,
+             salary_currency, apply_url, posted_at, first_seen_at, repost_count,
              company:companies ( id, canonical_name ),
              ghost_signals ( risk_band, reasons )
            )`
