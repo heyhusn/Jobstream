@@ -97,16 +97,17 @@ export interface Database {
           extracted_text: string | null;
           parse_report: Record<string, unknown> | null;
           is_primary: boolean;
+          track_name: string | null;
           created_at: string;
         };
         Insert: Omit<
           Database["public"]["Tables"]["resumes"]["Row"],
-          "id" | "created_at" | "version" | "is_primary" | "extracted_text" | "parse_report"
+          "id" | "created_at" | "version" | "is_primary" | "extracted_text" | "parse_report" | "track_name"
         > &
           Partial<
             Pick<
               Database["public"]["Tables"]["resumes"]["Row"],
-              "version" | "is_primary" | "extracted_text" | "parse_report"
+              "version" | "is_primary" | "extracted_text" | "parse_report" | "track_name"
             >
           >;
         Update: Partial<Database["public"]["Tables"]["resumes"]["Row"]>;

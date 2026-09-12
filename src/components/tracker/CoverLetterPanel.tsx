@@ -14,6 +14,10 @@ import {
   useUpdateCoverLetter,
   type CoverLetterTaskResult,
 } from "@/hooks/useCoverLetter";
+import {
+  useCoverLetterBlocks,
+  useCreateCoverLetterBlock,
+} from "@/hooks/useCoverLetterBlocks";
 import type { ApplicationItem } from "@/hooks/useApplications";
 import type { CoverLetterTone } from "@/types/database";
 import { TaskState } from "@/components/ui/TaskState";
@@ -335,6 +339,33 @@ function LetterEditor({
   const [subject, setSubject] = useState(initialSubject ?? "");
   const [body, setBody] = useState(initialBody);
   const timer = useRef<number | null>(null);
+
+  // Minor m04: a personal snippet library, independent of AI
+  // generation — insert a saved block into the draft, or save the
+  // current selection (or the whole body, if nothing's selected) as
+  // a new one.
+  const { data: blocks } = useCoverLetterBlocks();
+  const createBlock = useCreateCoverLetterBlock();
+  const [selectedBlockId, setSelectedBlockId] = useState("");
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  function insertBlock() {
+    const block = blocks?.find((b) => b.id === selectedBlockId);
+    if (!block) return;
+    const next = body.trim() ? `${body}\n\n${block.content}` : block.content;
+    setBody(next);
+    queueSave(subject, next);
+  }
+
+  function saveSelectionAsBlock() {
+    const el = bodyRef.current;
+    const selected = el ? body.slice(el.selectionStart, el.selectionEnd) : "";
+    const content = (selected || body).trim();
+    if (!content) return;
+    const label = window.prompt("Name this block", content.slice(0, 40));
+    if (!label) return;
+    createBlock.mutate({ label, content });
+  }
   // The last text this editor put on the wire, so an echo of our own
   // save isn't mistaken for a new draft arriving.
   const sent = useRef<{ subject: string | null; body: string } | null>(null);
@@ -459,6 +490,7 @@ function LetterEditor({
         </span>
         <textarea
           id={`letter-body-${letterId}`}
+          ref={bodyRef}
           value={body}
           onChange={(e) => {
             setBody(e.target.value);
@@ -469,6 +501,38 @@ function LetterEditor({
           className="w-full resize-y rounded-app border border-rule bg-raised px-3 py-2 text-sm leading-relaxed transition-colors focus:border-ink"
         />
       </label>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <select
+          value={selectedBlockId}
+          onChange={(e) => setSelectedBlockId(e.target.value)}
+          className="rounded-app border border-rule bg-paper px-2 py-1 text-xs text-ink-70 outline-none focus:border-ink"
+        >
+          <option value="">Insert a saved block…</option>
+          {(blocks ?? []).map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={insertBlock}
+          disabled={!selectedBlockId}
+          className="text-ink-70 underline hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Insert
+        </button>
+        <button
+          type="button"
+          onClick={saveSelectionAsBlock}
+          disabled={createBlock.isPending}
+          className="text-ink-70 underline hover:text-ink"
+          title="Saves the selected text (or the whole letter, if nothing's selected) as a reusable block"
+        >
+          Save selection as block
+        </button>
+      </div>
 
       {saveFailed && (
         <p role="alert" className="text-xs text-ghost">

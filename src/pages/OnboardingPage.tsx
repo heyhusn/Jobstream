@@ -26,6 +26,7 @@ export function OnboardingPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
+  const [resumeStoragePath, setResumeStoragePath] = useState<string | null>(null);
 
   // Editable form state, seeded from the parse but never trusted
   // as-is — nothing is written to the profile until this is saved.
@@ -86,6 +87,7 @@ export function OnboardingPage() {
       }
 
       setResumeId(resume.id);
+      setResumeStoragePath(path);
       await parseTask.run({ extracted_text: text });
     },
     [user, parseTask]
@@ -309,7 +311,22 @@ export function OnboardingPage() {
                 {saving ? "Saving…" : "Looks right — find my matches"}
               </Button>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // Without this, "Start over" left the just-uploaded
+                  // row and its storage file behind and re-dropping a
+                  // file inserted a second, unrelated `resumes` row —
+                  // every prior row orphaned forever, since nothing
+                  // else in the app ever surfaced them until the
+                  // Resumes page (minor m01) made all versions
+                  // visible and this showed up as duplicate "v1"s.
+                  if (resumeId) {
+                    await supabase.from("resumes").delete().eq("id", resumeId);
+                  }
+                  if (resumeStoragePath) {
+                    await supabase.storage.from("resumes").remove([resumeStoragePath]);
+                  }
+                  setResumeId(null);
+                  setResumeStoragePath(null);
                   setStep("upload");
                   parseTask.reset();
                 }}

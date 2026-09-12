@@ -10,6 +10,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 const links = [
   { to: "/matches", label: "Matches" },
   { to: "/search", label: "Search" },
+  { to: "/resumes", label: "Resumes" },
   { to: "/tracker", label: "Tracker" },
   { to: "/companies", label: "Companies" },
   { to: "/salary", label: "Salary" },

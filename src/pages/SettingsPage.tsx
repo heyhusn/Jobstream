@@ -11,6 +11,7 @@ import {
   useAddNegativeKeyword,
   useRemoveNegativeKeyword,
 } from "@/hooks/useNegativeKeywords";
+import { useCoverLetterBlocks, useDeleteCoverLetterBlock } from "@/hooks/useCoverLetterBlocks";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -43,6 +44,8 @@ export function SettingsPage() {
       <ProfileSection />
 
       <SearchFiltersSection />
+
+      <CoverLetterBlocksSection />
 
       <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
         <h2 className="text-sm font-semibold">Export your data</h2>
@@ -429,6 +432,44 @@ function SearchFiltersSection() {
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+/**
+ * Minor m04's management view — creating and inserting a block
+ * happens right in the cover-letter editor (`CoverLetterPanel.tsx`);
+ * this is just where the library gets reviewed and pruned.
+ */
+function CoverLetterBlocksSection() {
+  const { data: blocks } = useCoverLetterBlocks();
+  const del = useDeleteCoverLetterBlock();
+
+  if (!blocks || blocks.length === 0) return null;
+
+  return (
+    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+      <h2 className="text-sm font-semibold">Cover letter blocks</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
+        Saved from the cover letter editor — insert any of these into a future draft.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {blocks.map((b) => (
+          <li key={b.id} className="flex items-start justify-between gap-3 text-sm">
+            <div>
+              <p className="font-medium">{b.label}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-45">{b.content}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => del.mutate(b.id)}
+              className="shrink-0 text-xs text-ink-45 hover:text-ghost"
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
