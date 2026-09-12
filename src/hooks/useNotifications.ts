@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { supabase, freshChannel } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -138,8 +138,7 @@ function useRealtimeNotifications(userId: string | undefined, key: readonly unkn
 
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`notifications-${key.join(":")}-${userId}`)
+    const channel = freshChannel(`notifications-${key.join(":")}-${userId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },

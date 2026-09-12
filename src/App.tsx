@@ -5,6 +5,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { OnboardingGate } from "@/components/layout/OnboardingGate";
 import { AppShell } from "@/components/layout/AppShell";
+import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
 
 // Route-level code splitting: signing in shouldn't pay for the
 // matches virtualizer, and browsing matches shouldn't pay for the
@@ -15,6 +16,7 @@ const OnboardingPage = lazy(() =>
   import("@/pages/OnboardingPage").then((m) => ({ default: m.OnboardingPage }))
 );
 const MatchesPage = lazy(() => import("@/pages/MatchesPage").then((m) => ({ default: m.MatchesPage })));
+const SearchPage = lazy(() => import("@/pages/SearchPage").then((m) => ({ default: m.SearchPage })));
 const TrackerPage = lazy(() => import("@/pages/TrackerPage").then((m) => ({ default: m.TrackerPage })));
 const SkillsPage = lazy(() => import("@/pages/SkillsPage").then((m) => ({ default: m.SkillsPage })));
 const InterviewPrepPage = lazy(() =>
@@ -70,37 +72,40 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/matches" replace />} />
-              <Route path="/sign-in" element={<SignInPage />} />
-              <Route path="/sign-up" element={<SignUpPage />} />
+          <RouteErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/matches" replace />} />
+                <Route path="/sign-in" element={<SignInPage />} />
+                <Route path="/sign-up" element={<SignUpPage />} />
 
-              <Route element={<ProtectedRoute />}>
-                <Route path="/onboarding" element={<OnboardingPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/onboarding" element={<OnboardingPage />} />
 
-                <Route element={<OnboardingGate />}>
-                  <Route element={<AppShell />}>
-                    <Route path="/matches" element={<MatchesPage />} />
-                    <Route path="/tracker" element={<TrackerPage />} />
-                    <Route path="/skills" element={<SkillsPage />} />
-                    <Route path="/interview/:sessionId" element={<InterviewPrepPage />} />
-                    <Route path="/companies" element={<CompaniesIndexPage />} />
-                    <Route path="/companies/:companyId" element={<CompanyPage />} />
-                    <Route path="/salary" element={<SalaryIntelligencePage />} />
-                    <Route path="/alerts" element={<AlertsPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/admin" element={<AdminPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/settings/billing" element={<BillingPage />} />
+                  <Route element={<OnboardingGate />}>
+                    <Route element={<AppShell />}>
+                      <Route path="/matches" element={<MatchesPage />} />
+                      <Route path="/search" element={<SearchPage />} />
+                      <Route path="/tracker" element={<TrackerPage />} />
+                      <Route path="/skills" element={<SkillsPage />} />
+                      <Route path="/interview/:sessionId" element={<InterviewPrepPage />} />
+                      <Route path="/companies" element={<CompaniesIndexPage />} />
+                      <Route path="/companies/:companyId" element={<CompanyPage />} />
+                      <Route path="/salary" element={<SalaryIntelligencePage />} />
+                      <Route path="/alerts" element={<AlertsPage />} />
+                      <Route path="/analytics" element={<AnalyticsPage />} />
+                      <Route path="/notifications" element={<NotificationsPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/settings/billing" element={<BillingPage />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
 
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
+          </RouteErrorBoundary>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

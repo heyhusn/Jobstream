@@ -89,7 +89,7 @@ function SalaryCard({ row }: { row: SalaryMarketSummaryRow }) {
 
       <dl className="mt-3 space-y-1.5 text-sm">
         <div className="flex items-baseline justify-between">
-          <dt className="text-ink-70">Range</dt>
+          <dt className="text-ink-70">Headline range</dt>
           <dd className="tabular font-medium">{money(row.min_salary, row.max_salary, row.salary_currency)}</dd>
         </div>
         <div className="flex items-baseline justify-between">
@@ -104,7 +104,9 @@ function SalaryCard({ row }: { row: SalaryMarketSummaryRow }) {
 
       <p className="mt-3 text-xs text-ink-45">
         Based on {row.sample_size} of {row.total_active_in_currency} active {row.salary_currency}{" "}
-        postings that disclose salary.
+        postings that disclose salary. "Headline range" spans each posting's own top-of-band
+        figure — it isn't the lowest floor to highest ceiling across postings, so it can look
+        narrower than any single job's own listed range.
       </p>
 
       {thin && (

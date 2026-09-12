@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +8,7 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 
 const links = [
   { to: "/matches", label: "Matches" },
+  { to: "/search", label: "Search" },
   { to: "/tracker", label: "Tracker" },
   { to: "/companies", label: "Companies" },
   { to: "/salary", label: "Salary" },
@@ -14,7 +16,16 @@ const links = [
   { to: "/analytics", label: "Analytics" },
   { to: "/skills", label: "Skills" },
   { to: "/settings", label: "Settings" },
+  { to: "/settings/billing", label: "Billing" },
 ];
+
+function PageFallback() {
+  return (
+    <div className="grid min-h-[50vh] place-items-center" aria-hidden="true">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-rule border-t-ink-70" />
+    </div>
+  );
+}
 
 export function AppShell() {
   const { signOut } = useAuth();
@@ -36,6 +47,7 @@ export function AppShell() {
               <NavLink
                 key={l.to}
                 to={l.to}
+                end={l.to === "/settings"}
                 className={({ isActive }) =>
                   clsx(
                     "border-b-[1.5px] border-transparent pb-0.5 text-sm text-ink-70 transition-colors hover:text-ink",
@@ -59,7 +71,9 @@ export function AppShell() {
       </header>
 
       <main className="mx-auto max-w-[1180px] px-6 py-10">
-        <Outlet />
+        <Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

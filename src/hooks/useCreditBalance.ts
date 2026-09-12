@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { supabase, freshChannel } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
 export function useCreditBalance() {
@@ -25,8 +25,7 @@ export function useCreditBalance() {
   // than making someone refresh the page to see their balance move.
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel(`credits-${user.id}`)
+    const channel = freshChannel(`credits-${user.id}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "credit_balances", filter: `user_id=eq.${user.id}` },
