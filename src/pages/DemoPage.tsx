@@ -1,4 +1,8 @@
 import { Link } from "react-router-dom";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import { Card } from "@/components/ui/Card";
+import { DonutRing } from "@/components/ui/DonutRing";
 
 interface SampleMatch {
   title: string;
@@ -7,7 +11,7 @@ interface SampleMatch {
   salary: string;
   score: number;
   riskLabel: string;
-  riskStyle: string;
+  riskTone: "live" | "neutral";
   breakdown: { label: string; delta: number; pass: boolean }[];
 }
 
@@ -22,7 +26,7 @@ const SAMPLE_MATCHES: SampleMatch[] = [
     salary: "EUR 85K–110K",
     score: 91,
     riskLabel: "Looks real",
-    riskStyle: "bg-live-wash text-live",
+    riskTone: "live",
     breakdown: [
       { label: "Semantic similarity score: 82%", delta: 82, pass: true },
       { label: "Work arrangement matches your preference", delta: 12, pass: true },
@@ -36,7 +40,7 @@ const SAMPLE_MATCHES: SampleMatch[] = [
     salary: "EUR 90K–120K",
     score: 84,
     riskLabel: "Worth a second look",
-    riskStyle: "bg-rule text-ink-70",
+    riskTone: "neutral",
     breakdown: [
       { label: "Semantic similarity score: 74%", delta: 74, pass: true },
       { label: "Reposted 4× — worth a closer look", delta: -10, pass: false },
@@ -50,7 +54,7 @@ const SAMPLE_MATCHES: SampleMatch[] = [
     salary: "USD 130K–160K",
     score: 78,
     riskLabel: "Looks real",
-    riskStyle: "bg-live-wash text-live",
+    riskTone: "live",
     breakdown: [
       { label: "Semantic similarity score: 71%", delta: 71, pass: true },
       { label: "Not your preferred work arrangement (onsite)", delta: -10, pass: false },
@@ -70,13 +74,11 @@ export function DemoPage() {
   return (
     <div className="min-h-screen bg-paper">
       <header className="sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur-sm">
-        <div className="mx-auto flex h-[62px] max-w-[1180px] items-center gap-6 px-6">
+        <div className="mx-auto flex h-[62px] max-w-[1100px] items-center gap-6 px-6">
           <span className="mr-auto font-display text-lg font-bold tracking-tight">
             job<span className="text-live">spy</span>
           </span>
-          <span className="rounded-full bg-rule px-2.5 py-1 text-xs font-medium text-ink-70">
-            Demo — sample data, not live
-          </span>
+          <Badge tone="neutral" className="rounded-full">Demo — sample data, not live</Badge>
           <Link
             to="/sign-up"
             className="rounded-app border-[1.5px] border-ink bg-ink px-3.5 py-1.5 text-sm font-semibold text-paper hover:bg-black"
@@ -86,7 +88,7 @@ export function DemoPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1180px] px-6 py-10">
+      <main className="mx-auto max-w-[1100px] px-6 py-10">
         <h1 className="text-2xl font-semibold">Your matches</h1>
         <p className="mt-1 text-sm text-ink-70">
           3 sample jobs cleared the bar. This is fictional data so you can see how the real page
@@ -94,29 +96,25 @@ export function DemoPage() {
           own.
         </p>
 
-        <div className="mt-5 rounded-app border border-rule bg-raised px-4">
+        <Card padding="none" className="mt-5 px-4">
           {SAMPLE_MATCHES.map((m, i) => (
             <div key={m.title} className={i > 0 ? "border-t border-rule-soft" : ""}>
-              <div className="flex items-center gap-4 px-1 py-4">
+              <div className="flex items-start gap-3 px-1 py-4">
+                <Avatar name={m.company} className="mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-semibold">{m.title}</span>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${m.riskStyle}`}>
-                      {m.riskLabel}
-                    </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{m.title}</span>
+                    <Badge tone={m.riskTone}>{m.riskLabel}</Badge>
                   </div>
                   <div className="mt-0.5 truncate text-sm text-ink-45">
                     {m.company} — {m.location} — {m.salary}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2.5">
-                  <span className="tabular text-sm font-semibold">{m.score}</span>
-                  <span className="h-1.5 w-14 overflow-hidden rounded-full bg-rule">
-                    <span className="block h-full rounded-full bg-live" style={{ width: `${m.score}%` }} />
-                  </span>
+                <div className="shrink-0 pt-0.5">
+                  <DonutRing value={m.score} />
                 </div>
               </div>
-              <div className="mb-4 rounded-app border border-rule-soft bg-paper px-4 py-3">
+              <div className="mb-4 rounded-app border border-rule-soft bg-raised px-4 py-3">
                 <ul className="space-y-2">
                   {m.breakdown.map((s, j) => (
                     <li key={j} className="flex items-baseline justify-between gap-4 text-sm">
@@ -136,7 +134,7 @@ export function DemoPage() {
               </div>
             </div>
           ))}
-        </div>
+        </Card>
 
         <p className="mt-6 text-center text-sm text-ink-70">
           Ready to see your own matches?{" "}

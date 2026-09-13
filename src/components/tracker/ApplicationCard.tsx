@@ -5,6 +5,8 @@ import { CSS } from "@dnd-kit/utilities";
 import type { ApplicationItem } from "@/hooks/useApplications";
 import { isOverdue, money, relativeDays } from "@/lib/format";
 import { STAGE_LABEL } from "@/lib/stages";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
 
 interface CardProps {
   item: ApplicationItem;
@@ -43,6 +45,8 @@ export const CardBody = forwardRef<HTMLDivElement, CardProps & { dragging?: bool
         )}
       >
         <div className="flex items-start gap-2">
+          <Avatar name={item.job.company?.canonical_name ?? item.job.title} size="sm" className="mt-0.5" />
+
           <button
             type="button"
             onClick={onOpen}
@@ -64,12 +68,9 @@ export const CardBody = forwardRef<HTMLDivElement, CardProps & { dragging?: bool
           </button>
 
           {score != null && (
-            <span
-              className="tabular shrink-0 rounded-full bg-live-wash px-1.5 py-0.5 text-[11px] font-semibold text-live"
-              title="Match score"
-            >
+            <Badge tone="live" className="shrink-0" title="Match score">
               {Math.round(score)}
-            </span>
+            </Badge>
           )}
         </div>
 

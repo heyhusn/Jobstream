@@ -1,11 +1,15 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
+import { Building2, ExternalLink, X } from "lucide-react";
 import type { ApplicationItem, ApplicationPatch } from "@/hooks/useApplications";
 import { useDeleteApplication, useResumes, useUpdateApplication } from "@/hooks/useApplications";
 import type { ApplicationStage } from "@/types/database";
 import { STAGES } from "@/lib/stages";
 import { fromDateInput, money, toDateInput } from "@/lib/format";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import { Field, fieldInputClass } from "@/components/ui/Field";
 import { CoverLetterPanel } from "./CoverLetterPanel";
 import { ResumeOptimizerPanel } from "./ResumeOptimizerPanel";
 import { AssistedApplyPanel } from "./AssistedApplyPanel";
@@ -168,6 +172,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
       >
         <header className="sticky top-0 z-10 border-b border-rule bg-paper/95 px-5 py-4 backdrop-blur-sm">
           <div className="flex items-start gap-3">
+            <Avatar name={item.job.company?.canonical_name ?? item.job.title} className="mt-0.5" />
             <div className="min-w-0 flex-1">
               <h2 id={titleId} className="text-lg font-semibold leading-tight">
                 {item.job.title}
@@ -177,17 +182,14 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
                 {item.job.location ? ` — ${item.job.location}` : ""}
               </p>
             </div>
-            {score != null && (
-              <span className="tabular shrink-0 rounded-full bg-live-wash px-2 py-1 text-xs font-semibold text-live">
-                {Math.round(score)}
-              </span>
-            )}
+            {score != null && <Badge tone="live">{Math.round(score)}</Badge>}
             <button
               type="button"
               onClick={onClose}
-              className="-mr-1 shrink-0 rounded-app px-2 py-1 text-sm text-ink-45 transition-colors hover:bg-rule-soft hover:text-ink"
+              aria-label="Close"
+              className="-mr-1 shrink-0 rounded-app p-1.5 text-ink-45 transition-colors hover:bg-rule-soft hover:text-ink"
             >
-              Close
+              <X size={18} />
             </button>
           </div>
           <p className="mt-2 text-sm text-ink-70">
@@ -200,7 +202,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
             <select
               value={item.stage}
               onChange={(e) => onStageChange(e.target.value as ApplicationStage)}
-              className={inputClass}
+              className={fieldInputClass}
             >
               {STAGES.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -216,7 +218,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
                 type="date"
                 value={toDateInput(item.applied_at)}
                 onChange={(e) => patch({ applied_at: fromDateInput(e.target.value) })}
-                className={inputClass}
+                className={fieldInputClass}
               />
             </Field>
             <Field label="Next action" hint="Follow-up, interview, deadline">
@@ -224,7 +226,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
                 type="date"
                 value={toDateInput(item.next_action_at)}
                 onChange={(e) => patch({ next_action_at: fromDateInput(e.target.value) })}
-                className={inputClass}
+                className={fieldInputClass}
               />
             </Field>
           </div>
@@ -241,7 +243,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
               value={item.resume_version_id ?? ""}
               onChange={(e) => patch({ resume_version_id: e.target.value || null })}
               disabled={!resumes || resumes.length === 0}
-              className={inputClass}
+              className={fieldInputClass}
             >
               <option value="">Not recorded</option>
               {(resumes ?? []).map((r) => (
@@ -260,7 +262,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
               onBlur={flushNotes}
               rows={4}
               placeholder="Screen with Dana on the 14th. Asked about the on-call rotation — she's checking."
-              className={clsx(inputClass, "resize-y leading-relaxed")}
+              className={clsx(fieldInputClass, "resize-y leading-relaxed")}
             />
           </Field>
 
@@ -269,16 +271,16 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
               href={item.job.apply_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-block rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper"
+              className="inline-flex items-center gap-1.5 rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-ink hover:text-paper"
             >
-              View posting
+              <ExternalLink size={14} /> View posting
             </a>
             {item.job.company && (
               <Link
                 to={`/companies/${item.job.company.id}`}
-                className="inline-block rounded-app border-[1.5px] border-rule px-3 py-1.5 text-sm font-medium text-ink-70 transition-colors hover:border-ink hover:text-ink"
+                className="inline-flex items-center gap-1.5 rounded-app border-[1.5px] border-rule px-3 py-1.5 text-sm font-medium text-ink-70 transition-colors hover:border-ink hover:text-ink"
               >
-                View company
+                <Building2 size={14} /> View company
               </Link>
             )}
           </div>
@@ -333,27 +335,5 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
         </footer>
       </div>
     </div>
-  );
-}
-
-const inputClass =
-  "w-full rounded-app border border-rule bg-raised px-3 py-2 text-sm text-ink " +
-  "transition-colors focus:border-ink disabled:cursor-not-allowed disabled:opacity-60";
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-ink-70">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-[11px] text-ink-45">{hint}</span>}
-    </label>
   );
 }

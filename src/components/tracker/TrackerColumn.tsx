@@ -3,6 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { ApplicationItem } from "@/hooks/useApplications";
 import type { ApplicationStage } from "@/types/database";
+import { Badge } from "@/components/ui/Badge";
 import { ApplicationCard } from "./ApplicationCard";
 
 interface Props {
@@ -39,9 +40,9 @@ export function TrackerColumn({
       className="flex w-[272px] shrink-0 flex-col"
       aria-label={`${label}, ${items.length} ${items.length === 1 ? "application" : "applications"}`}
     >
-      <header className="mb-2 flex items-baseline gap-2 px-1">
+      <header className="mb-2 flex items-center gap-2 px-1">
         <h2 className={clsx("text-sm font-semibold", terminal && "text-ink-45")}>{label}</h2>
-        <span className="tabular text-xs text-ink-45">{items.length}</span>
+        <Badge tone="neutral" className="tabular">{items.length}</Badge>
       </header>
 
       <div

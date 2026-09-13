@@ -21,7 +21,7 @@ export interface HybridSearchResult {
     visa_sponsorship: VisaSponsorship | null;
     seniority: Seniority | null;
     tech_stack: string[];
-    company: { id: string; canonical_name: string } | null;
+    company: { id: string; canonical_name: string; domain: string | null } | null;
   };
   risk_band: RiskBand | null;
   rrf_score: number;

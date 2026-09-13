@@ -1,6 +1,8 @@
 import { useSalaryMarketSummary, type SalaryMarketSummaryRow } from "@/hooks/useSalaryIntelligence";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { money } from "@/lib/format";
 
 // Below this sample size, a card's numbers get called out explicitly
@@ -16,6 +18,12 @@ const compactNumber = new Intl.NumberFormat("en-US", { notation: "compact" });
 function formatAmount(n: number | null, currency: string): string {
   if (n == null) return "—";
   return `${currency} ${compactNumber.format(n)}`;
+}
+
+/** The nominal USD-equivalent shown next to a native-currency figure — never in place of it. */
+function formatUsdEquivalent(n: number | null): string | null {
+  if (n == null) return null;
+  return `≈ $${compactNumber.format(n)} USD`;
 }
 
 function formatPercent(numerator: number, denominator: number): string {
@@ -41,16 +49,18 @@ export function SalaryIntelligencePage() {
       <div className="mb-4">
         <h1 className="text-2xl font-semibold">Salary intelligence</h1>
         <p className="mt-1 text-sm text-ink-70">
-          Built from disclosed salaries on currently active postings. Grouped by currency —
-          amounts are never converted between currencies, and postings that don't disclose a
-          salary aren't estimated or guessed at, only counted toward the disclosure rate below.
+          Built from disclosed salaries on currently active postings. Grouped by currency, with a
+          nominal USD conversion shown alongside each figure where a current exchange rate is
+          available (via the free Frankfurter/ECB rate feed) — never in place of the native-currency
+          number, and never a purchasing-power adjustment. Postings that don't disclose a salary
+          aren't estimated or guessed at, only counted toward the disclosure rate below.
         </p>
       </div>
 
       {isPending && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-40 animate-pulse rounded-app bg-raised" />
+            <Skeleton key={i} className="h-40" />
           ))}
         </div>
       )}
@@ -79,7 +89,7 @@ function SalaryCard({ row }: { row: SalaryMarketSummaryRow }) {
   const thin = row.sample_size < THIN_SAMPLE_THRESHOLD;
 
   return (
-    <div className="rounded-app border border-rule bg-raised px-4 py-4">
+    <Card>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">{row.salary_currency}</h2>
         <span className="text-xs text-ink-70">
@@ -94,13 +104,30 @@ function SalaryCard({ row }: { row: SalaryMarketSummaryRow }) {
         </div>
         <div className="flex items-baseline justify-between">
           <dt className="text-ink-70">Median</dt>
-          <dd className="tabular font-medium">{formatAmount(row.median_salary, row.salary_currency)}</dd>
+          <div className="text-right">
+            <dd className="tabular font-medium">{formatAmount(row.median_salary, row.salary_currency)}</dd>
+            {formatUsdEquivalent(row.median_salary_usd) && (
+              <dd className="tabular text-xs text-ink-45">{formatUsdEquivalent(row.median_salary_usd)}</dd>
+            )}
+          </div>
         </div>
         <div className="flex items-baseline justify-between">
           <dt className="text-ink-70">Average</dt>
-          <dd className="tabular font-medium">{formatAmount(row.avg_salary, row.salary_currency)}</dd>
+          <div className="text-right">
+            <dd className="tabular font-medium">{formatAmount(row.avg_salary, row.salary_currency)}</dd>
+            {formatUsdEquivalent(row.avg_salary_usd) && (
+              <dd className="tabular text-xs text-ink-45">{formatUsdEquivalent(row.avg_salary_usd)}</dd>
+            )}
+          </div>
         </div>
       </dl>
+
+      {row.fx_as_of && (
+        <p className="mt-2 text-xs text-ink-45">
+          USD figures converted at the ECB reference rate as of {row.fx_as_of} — nominal only, not
+          purchasing-power adjusted.
+        </p>
+      )}
 
       <p className="mt-3 text-xs text-ink-45">
         Based on {row.sample_size} of {row.total_active_in_currency} active {row.salary_currency}{" "}
@@ -115,6 +142,6 @@ function SalaryCard({ row }: { row: SalaryMarketSummaryRow }) {
           treat as a reliable market figure.
         </p>
       )}
-    </div>
+    </Card>
   );
 }

@@ -16,6 +16,10 @@ import {
 import { useApplications } from "@/hooks/useApplications";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { MiniBar } from "@/components/ui/MiniBar";
 import { STAGES } from "@/lib/stages";
 
 const MIN_RESPONSE_SAMPLE = 3;
@@ -28,11 +32,11 @@ const MIN_RESPONSE_SAMPLE = 3;
 // market-wide salary sample.
 const THIN_TREND_THRESHOLD = 3;
 
-const bandStyles: Record<ExposureBand, string> = {
-  low: "bg-live-wash text-live",
-  medium: "bg-rule text-ink-70",
-  high: "bg-ghost-wash text-ghost",
-  unknown: "bg-rule text-ink-45",
+const bandTone: Record<ExposureBand, "live" | "neutral" | "ghost"> = {
+  low: "live",
+  medium: "neutral",
+  high: "ghost",
+  unknown: "neutral",
 };
 const bandLabel: Record<ExposureBand, string> = {
   low: "Looks real",
@@ -50,7 +54,7 @@ const dateTimeFmt = new Intl.DateTimeFormat("en-US", {
 });
 
 function SkeletonBlock({ className = "h-24" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-app bg-raised ${className}`} aria-hidden="true" />;
+  return <Skeleton className={className} />;
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -199,10 +203,10 @@ function WeeklyDigestSection({ applications }: { applications: ReturnType<typeof
   if (!applications) return <SkeletonBlock className="h-20" />;
 
   return (
-    <div className="flex flex-wrap gap-6 rounded-app border border-rule bg-raised px-4 py-4">
+    <Card className="flex flex-wrap gap-6">
       <DigestStat label="Applied" value={stats.appliedThisWeek} compareTo={stats.appliedLastWeek} />
       <DigestStat label="Responses received" value={stats.respondedThisWeek} />
-    </div>
+    </Card>
   );
 }
 
@@ -254,7 +258,7 @@ function ResponseRateSection({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-app border border-rule bg-raised px-4 py-3">
+      <Card>
         <div className="flex items-baseline justify-between">
           <span className="text-sm text-ink-70">Your overall response rate</span>
           <span className="tabular text-lg font-semibold">{Math.round(overallRate * 100)}%</span>
@@ -266,7 +270,7 @@ function ResponseRateSection({
             {benchmark.contributing_users < 5 ? " — too few to read as a reliable median" : ""}.
           </p>
         )}
-      </div>
+      </Card>
 
       <ResponseRateBreakdown
         title="By company"
@@ -298,12 +302,15 @@ function ResponseRateBreakdown({
   return (
     <div>
       <h3 className="mb-2 text-xs font-medium text-ink-70">{title}</h3>
-      <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+      <Card padding="none" className="px-4">
         {rows.map((r) => {
           const thin = r.applied_count < MIN_RESPONSE_SAMPLE;
           const pct = rate(r);
           return (
-            <div key={r.label} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+            <div
+              key={r.label}
+              className="flex items-center justify-between gap-4 border-b border-rule-soft py-2.5 text-sm last:border-b-0"
+            >
               <span className="truncate">{r.label}</span>
               <span className="tabular shrink-0 text-ink-70">
                 {pct != null ? `${Math.round(pct * 100)}%` : "—"} ({r.applied_count}{" "}
@@ -313,7 +320,7 @@ function ResponseRateBreakdown({
             </div>
           );
         })}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -349,7 +356,7 @@ function SkillDemandSection({
       {[...bySkill.entries()].map(([skill, points]) => {
         const total = points.reduce((s, p) => s + p.job_count, 0);
         return (
-          <div key={skill} className="rounded-app border border-rule bg-raised px-4 py-3">
+          <Card key={skill}>
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-medium capitalize">{skill}</span>
               <span className="text-xs text-ink-45">
@@ -357,7 +364,7 @@ function SkillDemandSection({
                 {points.length} {points.length === 1 ? "week" : "weeks"}
               </span>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>
@@ -392,27 +399,15 @@ function PipelineSection({
     );
   }
 
-  const maxCount = Math.max(1, ...STAGES.map((s) => countByStage.get(s.id) ?? 0));
-
   return (
-    <div className="space-y-2.5 rounded-app border border-rule bg-raised px-4 py-4">
-      {STAGES.map((stage) => {
-        const count = countByStage.get(stage.id) ?? 0;
-        const widthPct = count === 0 ? 0 : Math.max(4, Math.round((count / maxCount) * 100));
-        return (
-          <div key={stage.id} className="flex items-center gap-3">
-            <span className="w-28 shrink-0 text-sm text-ink-70">{stage.label}</span>
-            <div className="h-5 flex-1 overflow-hidden rounded-app bg-rule">
-              <div
-                className={`h-full rounded-app ${count > 0 ? "bg-ink" : ""}`}
-                style={{ width: `${widthPct}%` }}
-              />
-            </div>
-            <span className="tabular w-8 shrink-0 text-right text-sm font-semibold">{count}</span>
-          </div>
-        );
-      })}
-    </div>
+    <Card>
+      <MiniBar
+        segments={STAGES.map((stage) => ({
+          label: stage.label,
+          value: countByStage.get(stage.id) ?? 0,
+        }))}
+      />
+    </Card>
   );
 }
 
@@ -442,9 +437,9 @@ function CreditUsageSection({
   }
 
   return (
-    <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+    <Card padding="none" className="px-4">
       {rows.map((row) => (
-        <div key={row.feature} className="flex items-center justify-between gap-4 py-3">
+        <div key={row.feature} className="flex items-center justify-between gap-4 border-b border-rule-soft py-3 last:border-b-0">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{row.feature}</p>
             <p className="mt-0.5 text-xs text-ink-45">
@@ -459,7 +454,7 @@ function CreditUsageSection({
           </div>
         </div>
       ))}
-    </div>
+    </Card>
   );
 }
 
@@ -493,26 +488,23 @@ function GhostExposureSection({
   const countByBand = new Map((rows ?? []).map((r) => [r.band, r.count]));
 
   return (
-    <div className="rounded-app border border-rule bg-raised px-4 py-4">
+    <Card>
       <div className="flex flex-wrap gap-2">
         {bandOrder.map((band) => {
           const count = countByBand.get(band) ?? 0;
           if (count === 0) return null;
           return (
-            <span
-              key={band}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${bandStyles[band]}`}
-            >
+            <Badge key={band} tone={bandTone[band]} className="gap-1.5 rounded-full px-2.5 py-1">
               <span className="tabular font-semibold">{count}</span>
               {bandLabel[band]}
-            </span>
+            </Badge>
           );
         })}
       </div>
       <p className="mt-3 text-xs text-ink-45">
         Across every job you've saved or applied to, not just what's currently open.
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -544,7 +536,7 @@ function ScoreTrendSection({
   const maxScore = Math.max(1, ...rows.map((r) => r.avg_score));
 
   return (
-    <div className="space-y-2.5 rounded-app border border-rule bg-raised px-4 py-4">
+    <Card className="space-y-2.5">
       {rows.map((row) => {
         const thin = row.sample_size < THIN_TREND_THRESHOLD;
         const widthPct = Math.max(4, Math.round((row.avg_score / maxScore) * 100));
@@ -566,7 +558,7 @@ function ScoreTrendSection({
           </div>
         );
       })}
-    </div>
+    </Card>
   );
 }
 
@@ -598,9 +590,9 @@ function InterviewProgressSection({
   }
 
   return (
-    <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+    <Card padding="none" className="px-4">
       {rows.map((row) => (
-        <div key={row.id} className="flex items-center justify-between gap-4 py-3">
+        <div key={row.id} className="flex items-center justify-between gap-4 border-b border-rule-soft py-3 last:border-b-0">
           <div className="min-w-0">
             <p className="text-sm font-medium capitalize">{row.mode} interview</p>
             <p className="mt-0.5 text-xs text-ink-45">
@@ -617,6 +609,6 @@ function InterviewProgressSection({
           </div>
         </div>
       ))}
-    </div>
+    </Card>
   );
 }

@@ -6,6 +6,9 @@ import { useLatestSkillGap, useInvalidateSkillGap, type SkillGapTaskResult } fro
 import { Button } from "@/components/ui/Button";
 import { TaskState } from "@/components/ui/TaskState";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 /**
  * M12 from the roadmap: aggregate the skills your target postings
@@ -83,7 +86,7 @@ export function SkillsPage() {
       {!busy && isPending && !result && (
         <div className="space-y-2" aria-hidden="true">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-app bg-raised" />
+            <Skeleton key={i} className="h-16" />
           ))}
         </div>
       )}
@@ -104,9 +107,9 @@ function SkillGapResultView({ result }: { result: SkillGapTaskResult }) {
   return (
     <div className="space-y-6">
       {result.narrative && (
-        <p className="rounded-app border border-rule bg-raised px-4 py-3 text-sm leading-relaxed text-ink-70">
-          {result.narrative}
-        </p>
+        <Card>
+          <p className="text-sm leading-relaxed text-ink-70">{result.narrative}</p>
+        </Card>
       )}
 
       <p className="text-xs text-ink-70">
@@ -118,21 +121,23 @@ function SkillGapResultView({ result }: { result: SkillGapTaskResult }) {
           <h2 className="mb-2 text-sm font-semibold">Gaps, most in-demand first</h2>
           <ul className="space-y-2">
             {result.gaps.map((gap) => (
-              <li key={gap.skill} className="rounded-app border border-rule bg-raised px-4 py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-sm font-semibold">{gap.skill}</span>
-                  <span className="text-xs text-ink-70">
-                    in {gap.mentioned_in} of {result.jobs_considered} postings
-                  </span>
-                </div>
-                {gap.why_it_matters && (
-                  <p className="mt-1 text-sm leading-relaxed text-ink-70">{gap.why_it_matters}</p>
-                )}
-                {gap.resource && (
-                  <p className="mt-1.5 text-xs text-ink-70">
-                    <span className="font-medium">Next step:</span> {gap.resource}
-                  </p>
-                )}
+              <li key={gap.skill}>
+                <Card>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-semibold">{gap.skill}</span>
+                    <span className="text-xs text-ink-70">
+                      in {gap.mentioned_in} of {result.jobs_considered} postings
+                    </span>
+                  </div>
+                  {gap.why_it_matters && (
+                    <p className="mt-1 text-sm leading-relaxed text-ink-70">{gap.why_it_matters}</p>
+                  )}
+                  {gap.resource && (
+                    <p className="mt-1.5 text-xs text-ink-70">
+                      <span className="font-medium">Next step:</span> {gap.resource}
+                    </p>
+                  )}
+                </Card>
               </li>
             ))}
           </ul>
@@ -144,12 +149,9 @@ function SkillGapResultView({ result }: { result: SkillGapTaskResult }) {
           <h2 className="mb-2 text-sm font-semibold">Already covered, and still in demand</h2>
           <div className="flex flex-wrap gap-1.5">
             {result.strengths.map((s) => (
-              <span
-                key={s}
-                className="rounded-app border border-rule bg-raised px-2.5 py-1 text-xs font-medium text-ink-70"
-              >
+              <Badge key={s} tone="neutral">
                 {s}
-              </span>
+              </Badge>
             ))}
           </div>
         </section>

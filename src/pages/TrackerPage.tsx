@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle, MessageSquare, Trophy } from "lucide-react";
 import { useApplications, useMatchScores, type ApplicationItem } from "@/hooks/useApplications";
 import { useNow } from "@/hooks/useNow";
 import { isOverdue, relativeDays } from "@/lib/format";
@@ -8,6 +9,7 @@ import { useEffectiveStages, useSetStagePref } from "@/hooks/useKanbanStagePrefs
 import { TrackerBoard } from "@/components/tracker/TrackerBoard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Stat } from "@/components/ui/Stat";
 
 export function TrackerPage() {
   const { data: applications, isPending, isError, refetch } = useApplications();
@@ -42,17 +44,17 @@ export function TrackerPage() {
           </p>
         </div>
 
-        <div className="flex items-end gap-4">
+        <div className="flex items-end gap-5">
           {!isPending && !isError && stats.total > 0 && (
-            <dl className="flex items-end gap-6">
-              <Stat label="Interviewing" value={stats.interviewing} />
-              <Stat label="Offers" value={stats.offers} />
+            <>
+              <Stat icon={<MessageSquare size={16} />} label="Interviewing" value={stats.interviewing} />
+              <Stat icon={<Trophy size={16} />} label="Offers" value={stats.offers} />
               <Stat
+                icon={<AlertTriangle size={16} className={stats.overdue > 0 ? "text-ghost" : undefined} />}
                 label="Overdue"
                 value={stats.overdue}
-                tone={stats.overdue > 0 ? "alert" : "normal"}
               />
-            </dl>
+            </>
           )}
           <button
             type="button"
@@ -101,29 +103,6 @@ export function TrackerPage() {
       {!isPending && !isError && applications && applications.length > 0 && (
         <TrackerBoard applications={applications} scores={scores ?? {}} />
       )}
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone = "normal",
-}: {
-  label: string;
-  value: number;
-  tone?: "normal" | "alert";
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-ink-45">{label}</dt>
-      <dd
-        className={
-          "tabular text-xl font-semibold " + (tone === "alert" ? "text-ghost" : "text-ink")
-        }
-      >
-        {value}
-      </dd>
     </div>
   );
 }

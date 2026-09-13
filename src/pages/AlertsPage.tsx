@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Field, fieldInputClass } from "@/components/ui/Field";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { money } from "@/lib/format";
 import type { RemoteType, RiskBand } from "@/types/database";
 import {
@@ -16,20 +22,16 @@ import {
   type JobAlert,
 } from "@/hooks/useJobAlerts";
 
-const bandStyles: Record<RiskBand, string> = {
-  low: "bg-live-wash text-live",
-  medium: "bg-rule text-ink-70",
-  high: "bg-ghost-wash text-ghost",
+const bandTone: Record<RiskBand, "live" | "neutral" | "ghost"> = {
+  low: "live",
+  medium: "neutral",
+  high: "ghost",
 };
 const bandLabel: Record<RiskBand, string> = {
   low: "Looks real",
   medium: "Worth a second look",
   high: "High ghost risk",
 };
-
-const inputClass =
-  "w-full rounded-app border border-rule bg-raised px-3 py-2 text-sm text-ink " +
-  "transition-colors focus:border-ink disabled:cursor-not-allowed disabled:opacity-60";
 
 function summarizeFilter(filter: AlertFilter): string {
   const parts: string[] = [];
@@ -74,7 +76,7 @@ export function AlertsPage() {
         {isPending && (
           <div className="space-y-3" aria-hidden="true">
             {[...Array(2)].map((_, i) => (
-              <div key={i} className="h-28 animate-pulse rounded-app bg-raised" />
+              <Skeleton key={i} className="h-28" />
             ))}
           </div>
         )}
@@ -140,104 +142,81 @@ function NewAlertForm() {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-app border border-rule bg-raised px-4 py-4"
-      aria-label="Create a new job alert"
-    >
-      <h2 className="mb-3 text-sm font-semibold">New alert</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Name" className="lg:col-span-1">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Staff platform roles"
-            className={inputClass}
-          />
-        </Field>
+    <Card>
+      <form onSubmit={handleSubmit} aria-label="Create a new job alert">
+        <h2 className="mb-3 text-sm font-semibold">New alert</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Field label="Name" className="lg:col-span-1">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Staff platform roles"
+              className={fieldInputClass}
+            />
+          </Field>
 
-        <Field label="Remote type">
-          <select
-            value={remoteType}
-            onChange={(e) => setRemoteType(e.target.value as RemoteType | "")}
-            className={inputClass}
-          >
-            <option value="">Any</option>
-            <option value="remote">Remote</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="onsite">Onsite</option>
-          </select>
-        </Field>
+          <Field label="Remote type">
+            <select
+              value={remoteType}
+              onChange={(e) => setRemoteType(e.target.value as RemoteType | "")}
+              className={fieldInputClass}
+            >
+              <option value="">Any</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="onsite">Onsite</option>
+            </select>
+          </Field>
 
-        <Field label="Minimum salary">
-          <input
-            type="number"
-            min={0}
-            step={1000}
-            value={minSalary}
-            onChange={(e) => setMinSalary(e.target.value)}
-            placeholder="Optional"
-            className={inputClass}
-          />
-        </Field>
+          <Field label="Minimum salary">
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              value={minSalary}
+              onChange={(e) => setMinSalary(e.target.value)}
+              placeholder="Optional"
+              className={fieldInputClass}
+            />
+          </Field>
 
-        <Field label="Keywords">
-          <input
-            type="text"
-            value={keywords}
-            onChange={(e) => setKeywords(e.target.value)}
-            placeholder="staff, platform"
-            className={inputClass}
-          />
-        </Field>
+          <Field label="Keywords">
+            <input
+              type="text"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="staff, platform"
+              className={fieldInputClass}
+            />
+          </Field>
 
-        <Field label="Max ghost risk">
-          <select
-            value={maxGhostRisk}
-            onChange={(e) => setMaxGhostRisk(e.target.value as RiskBand | "")}
-            className={inputClass}
-          >
-            <option value="">Any</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </Field>
-      </div>
+          <Field label="Max ghost risk">
+            <select
+              value={maxGhostRisk}
+              onChange={(e) => setMaxGhostRisk(e.target.value as RiskBand | "")}
+              className={fieldInputClass}
+            >
+              <option value="">Any</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </Field>
+        </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={!canSave}
-          className="rounded-app border border-ink bg-ink px-4 py-2 text-sm font-semibold text-paper hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {create.isPending ? "Saving…" : "Save alert"}
-        </button>
-        {create.isError && (
-          <p role="alert" className="text-xs text-ghost">
-            Couldn't save that alert. Try again.
-          </p>
-        )}
-      </div>
-    </form>
-  );
-}
-
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className ?? ""}`}>
-      <span className="mb-1.5 block text-xs font-medium text-ink-70">{label}</span>
-      {children}
-    </label>
+        <div className="mt-3 flex items-center gap-3">
+          <Button type="submit" disabled={!canSave}>
+            {create.isPending ? "Saving…" : "Save alert"}
+          </Button>
+          {create.isError && (
+            <p role="alert" className="text-xs text-ghost">
+              Couldn't save that alert. Try again.
+            </p>
+          )}
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -260,7 +239,7 @@ function AlertCard({ alert }: { alert: JobAlert }) {
   };
 
   return (
-    <div className="rounded-app border border-rule bg-raised px-4 py-4">
+    <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">{alert.name}</h3>
@@ -268,14 +247,9 @@ function AlertCard({ alert }: { alert: JobAlert }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCheckNow}
-            disabled={isFetching}
-            className="rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button variant="ghost" onClick={handleCheckNow} disabled={isFetching}>
             {isFetching ? "Checking…" : "Check now"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -342,7 +316,7 @@ function AlertCard({ alert }: { alert: JobAlert }) {
           </button>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -368,13 +342,7 @@ function MatchRow({ job }: { job: AlertJob }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-semibold">{job.title}</span>
-          {job.risk_band && (
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${bandStyles[job.risk_band]}`}
-            >
-              {bandLabel[job.risk_band]}
-            </span>
-          )}
+          {job.risk_band && <Badge tone={bandTone[job.risk_band]}>{bandLabel[job.risk_band]}</Badge>}
         </div>
         <div className="mt-0.5 truncate text-sm text-ink-45">
           {job.company ? (
@@ -395,9 +363,9 @@ function MatchRow({ job }: { job: AlertJob }) {
         href={job.apply_url}
         target="_blank"
         rel="noreferrer"
-        className="shrink-0 rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper"
       >
-        View posting
+        <ExternalLink size={14} /> View posting
       </a>
     </div>
   );

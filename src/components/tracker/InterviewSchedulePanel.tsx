@@ -7,6 +7,7 @@ import {
   listTimeZones,
   browserTimeZone,
 } from "@/lib/timezone";
+import { usePublicHolidays, findHolidayOnDate } from "@/hooks/usePublicHolidays";
 
 const ZONES = listTimeZones();
 const MY_ZONE = browserTimeZone();
@@ -41,6 +42,16 @@ export function InterviewSchedulePanel({
   }
 
   const utcInstant = item.interview_at ? new Date(item.interview_at) : null;
+
+  // Company hq_country (from ingestion) is a real, stored ISO code —
+  // unlike the freeform IANA zone above, it doesn't need guessing at.
+  // Silently skipped when unknown, same "never present a guess" rule
+  // as everywhere else in this app (see 0012/0025's own callouts).
+  const countryCode = item.job.company?.hq_country ?? null;
+  const dateOnly = localValue ? localValue.slice(0, 10) : null;
+  const year = dateOnly ? Number(dateOnly.slice(0, 4)) : new Date().getFullYear();
+  const { data: holidays } = usePublicHolidays(countryCode, year);
+  const holiday = dateOnly ? findHolidayOnDate(holidays, dateOnly) : null;
 
   return (
     <section className="border-t border-rule pt-5">
@@ -79,6 +90,14 @@ export function InterviewSchedulePanel({
               — that's <strong>{formatInZone(utcInstant, MY_ZONE)}</strong> your time.
             </>
           )}
+        </p>
+      )}
+
+      {holiday && (
+        <p className="mt-2 rounded-app border border-ghost/30 bg-ghost-wash px-3 py-2 text-xs text-ghost">
+          Heads up — {holiday.date} is <strong>{holiday.name}</strong> in {countryCode}, based on{" "}
+          {item.job.company?.canonical_name ?? "this company"}'s HQ country. Their office may be
+          closed that day.
         </p>
       )}
     </section>

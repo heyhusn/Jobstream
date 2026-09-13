@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import clsx from "clsx";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { extractResumeText } from "@/lib/extractText";
 import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { Button } from "@/components/ui/Button";
 import { TaskState } from "@/components/ui/TaskState";
+import { Card } from "@/components/ui/Card";
+import { Field, fieldInputClass } from "@/components/ui/Field";
 
 interface ParseInput extends Record<string, unknown> {
   extracted_text: string;
@@ -18,6 +21,33 @@ interface ParseResult extends Record<string, unknown> {
 }
 
 type Step = "upload" | "confirm";
+
+function StepIndicator({ step }: { step: Step }) {
+  const steps: { id: Step; label: string }[] = [
+    { id: "upload", label: "Upload" },
+    { id: "confirm", label: "Confirm" },
+  ];
+  const activeIndex = steps.findIndex((s) => s.id === step);
+
+  return (
+    <ol className="mt-6 flex items-center gap-2 text-xs font-medium text-ink-45">
+      {steps.map((s, i) => (
+        <li key={s.id} className="flex items-center gap-2">
+          <span
+            className={clsx(
+              "flex h-5 w-5 items-center justify-center rounded-full border text-[11px]",
+              i <= activeIndex ? "border-ink bg-ink text-paper" : "border-rule text-ink-45"
+            )}
+          >
+            {i + 1}
+          </span>
+          <span className={i <= activeIndex ? "text-ink" : undefined}>{s.label}</span>
+          {i < steps.length - 1 && <span className="mx-1 h-px w-6 bg-rule" aria-hidden="true" />}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export function OnboardingPage() {
   const { user } = useAuth();
@@ -157,6 +187,8 @@ export function OnboardingPage() {
           job<span className="text-live">spy</span>
         </span>
 
+        <StepIndicator step={step} />
+
         {step === "upload" && (
           <>
             <h1 className="mt-8 text-2xl font-semibold">Upload your resume</h1>
@@ -231,27 +263,20 @@ export function OnboardingPage() {
               you'll see — nothing is saved until you confirm.
             </p>
 
-            <div className="mt-7 space-y-4 rounded-app border border-rule bg-raised p-5">
-              <div>
-                <label htmlFor="skills" className="mb-1.5 block text-sm font-medium">
-                  Skills
-                </label>
+            <Card className="mt-7 space-y-4">
+              <Field label="Skills" htmlFor="skills" hint="Comma-separated. Add or remove freely.">
                 <textarea
                   id="skills"
                   rows={3}
                   value={skillsText}
                   onChange={(e) => setSkillsText(e.target.value)}
-                  className="w-full rounded-app border-[1.5px] border-rule bg-paper px-3 py-2.5 text-sm outline-none focus:border-ink"
+                  className={fieldInputClass}
                   placeholder="python, fastapi, postgresql…"
                 />
-                <p className="mt-1 text-xs text-ink-45">Comma-separated. Add or remove freely.</p>
-              </div>
+              </Field>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="years" className="mb-1.5 block text-sm font-medium">
-                    Years of experience
-                  </label>
+                <Field label="Years of experience" htmlFor="years">
                   <input
                     id="years"
                     type="number"
@@ -259,13 +284,10 @@ export function OnboardingPage() {
                     max={50}
                     value={years}
                     onChange={(e) => setYears(Number(e.target.value))}
-                    className="w-full rounded-app border-[1.5px] border-rule bg-paper px-3 py-2.5 text-sm outline-none focus:border-ink"
+                    className={fieldInputClass}
                   />
-                </div>
-                <div>
-                  <label htmlFor="salaryFloor" className="mb-1.5 block text-sm font-medium">
-                    Salary floor (optional)
-                  </label>
+                </Field>
+                <Field label="Salary floor (optional)" htmlFor="salaryFloor">
                   <input
                     id="salaryFloor"
                     type="number"
@@ -273,28 +295,25 @@ export function OnboardingPage() {
                     value={salaryFloor}
                     onChange={(e) => setSalaryFloor(e.target.value)}
                     placeholder="e.g. 90000"
-                    className="w-full rounded-app border-[1.5px] border-rule bg-paper px-3 py-2.5 text-sm outline-none focus:border-ink"
+                    className={fieldInputClass}
                   />
-                </div>
+                </Field>
               </div>
 
-              <div>
-                <label htmlFor="remote" className="mb-1.5 block text-sm font-medium">
-                  Work arrangement
-                </label>
+              <Field label="Work arrangement" htmlFor="remote">
                 <select
                   id="remote"
                   value={remotePreference}
                   onChange={(e) => setRemotePreference(e.target.value as typeof remotePreference)}
-                  className="w-full rounded-app border-[1.5px] border-rule bg-paper px-3 py-2.5 text-sm outline-none focus:border-ink"
+                  className={fieldInputClass}
                 >
                   <option value="no_preference">No strong preference</option>
                   <option value="remote">Remote</option>
                   <option value="hybrid">Hybrid</option>
                   <option value="onsite">Onsite</option>
                 </select>
-              </div>
-            </div>
+              </Field>
+            </Card>
 
             {saveError && (
               <p className="mt-4 rounded-app border border-ghost/40 bg-ghost-wash px-3 py-2 text-sm text-ghost">

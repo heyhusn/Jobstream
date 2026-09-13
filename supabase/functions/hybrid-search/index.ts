@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
         `id, title, description, location, remote_type, salary_min, salary_max,
          salary_currency, apply_url, posted_at, first_seen_at, repost_count,
          visa_sponsorship, seniority, tech_stack,
-         company:companies ( id, canonical_name ),
+         company:companies ( id, canonical_name, domain ),
          ghost_signals ( risk_band )`
       )
       .in("id", jobIds);

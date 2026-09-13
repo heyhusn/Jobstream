@@ -23,7 +23,7 @@ export interface MatchListItem {
     visa_sponsorship: VisaSponsorship | null;
     seniority: Seniority | null;
     tech_stack: string[];
-    company: { id: string; canonical_name: string } | null;
+    company: { id: string; canonical_name: string; domain: string | null } | null;
   };
   ghost: { risk_band: RiskBand; reasons: string[] } | null;
 }
@@ -55,7 +55,7 @@ interface RawMatchRow {
     visa_sponsorship: VisaSponsorship | null;
     seniority: Seniority | null;
     tech_stack: string[];
-    company: { id: string; canonical_name: string } | null;
+    company: { id: string; canonical_name: string; domain: string | null } | null;
     ghost_signals: { risk_band: RiskBand; reasons: string[] }[] | null;
   };
 }
@@ -75,7 +75,7 @@ export function useMatches() {
              id, title, description, location, remote_type, salary_min, salary_max,
              salary_currency, apply_url, posted_at, first_seen_at, repost_count,
              visa_sponsorship, seniority, tech_stack,
-             company:companies ( id, canonical_name ),
+             company:companies ( id, canonical_name, domain ),
              ghost_signals ( risk_band, reasons )
            )`
         )

@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import {
   timeAgo,
   useMarkAllNotificationsRead,
@@ -36,20 +39,16 @@ export function NotificationsPage() {
           </p>
         </div>
         {unreadCount > 0 && (
-          <button
-            onClick={() => markAllRead.mutate()}
-            disabled={markAllRead.isPending}
-            className="shrink-0 rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button variant="ghost" onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
             Mark all read
-          </button>
+          </Button>
         )}
       </div>
 
       {isPending && (
         <div className="space-y-3" aria-hidden="true">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-app bg-raised" />
+            <Skeleton key={i} className="h-20" />
           ))}
         </div>
       )}
@@ -111,15 +110,13 @@ function NotificationRow({
     </div>
   );
 
-  const className = "block rounded-app border border-rule bg-raised px-4 py-3.5";
-
   if (notification.link) {
     return (
-      <Link to={notification.link} onClick={unread ? onMarkRead : undefined} className={className}>
-        {body}
+      <Link to={notification.link} onClick={unread ? onMarkRead : undefined} className="block">
+        <Card className="transition-colors hover:border-ink">{body}</Card>
       </Link>
     );
   }
 
-  return <div className={className}>{body}</div>;
+  return <Card>{body}</Card>;
 }

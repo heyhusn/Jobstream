@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { FileText, Trash2, Upload } from "lucide-react";
 import {
   useResumeVersions,
   useUploadResumeVersion,
@@ -10,6 +11,10 @@ import { diffLines } from "@/lib/diffText";
 import { downloadResumeTxt, downloadResumeRtf, printResumeAsPdf } from "@/lib/resumeExport";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { fieldInputClass } from "@/components/ui/Field";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 /**
  * Minors m01 (version manager + diff), m02 (per-track resume sets),
@@ -62,21 +67,25 @@ export function ResumesPage() {
         </p>
       </div>
 
-      <section className="mb-6 rounded-app border border-dashed border-rule bg-raised px-4 py-4">
-        <h2 className="text-sm font-semibold">Upload a new version</h2>
+      <Card className="mb-6 border-dashed">
+        <div className="flex items-center gap-2">
+          <FileText size={16} className="text-ink-45" />
+          <h2 className="text-sm font-semibold">Upload a new version</h2>
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={trackName}
             onChange={(e) => setTrackName(e.target.value)}
             placeholder="Track (optional) — e.g. AI/ML, Backend"
-            className="rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            className={fieldInputClass + " w-auto"}
           />
           <Button
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
             disabled={upload.isPending}
           >
+            <Upload size={15} />
             {upload.isPending ? "Uploading…" : "Choose a file"}
           </Button>
           <input
@@ -92,12 +101,12 @@ export function ResumesPage() {
           />
         </div>
         {uploadError && <p className="mt-2 text-xs text-ghost">{uploadError}</p>}
-      </section>
+      </Card>
 
       {isPending && (
         <div className="space-y-2" aria-hidden="true">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-app bg-raised" />
+            <Skeleton key={i} className="h-16" />
           ))}
         </div>
       )}
@@ -107,7 +116,7 @@ export function ResumesPage() {
       )}
 
       {!isPending && versions && versions.length > 0 && (
-        <div className="rounded-app border border-rule bg-raised px-4 divide-y divide-rule-soft">
+        <Card padding="none" className="px-4">
           {versions.map((v) => (
             <ResumeRow
               key={v.id}
@@ -120,7 +129,7 @@ export function ResumesPage() {
               }}
             />
           ))}
-        </div>
+        </Card>
       )}
 
       {versions && versions.length > 1 && (
@@ -130,7 +139,7 @@ export function ResumesPage() {
             <select
               value={compareA}
               onChange={(e) => setCompareA(e.target.value)}
-              className="rounded-app border border-rule bg-raised px-3 py-2 text-sm"
+              className={fieldInputClass + " w-auto"}
             >
               <option value="">Version A…</option>
               {versions.map((v) => (
@@ -142,7 +151,7 @@ export function ResumesPage() {
             <select
               value={compareB}
               onChange={(e) => setCompareB(e.target.value)}
-              className="rounded-app border border-rule bg-raised px-3 py-2 text-sm"
+              className={fieldInputClass + " w-auto"}
             >
               <option value="">Version B…</option>
               {versions.map((v) => (
@@ -154,7 +163,7 @@ export function ResumesPage() {
           </div>
 
           {diff && (
-            <div className="mt-4 max-h-[500px] overflow-y-auto rounded-app border border-rule bg-raised px-4 py-3 font-mono text-xs leading-relaxed">
+            <Card className="mt-4 max-h-[500px] overflow-y-auto font-mono text-xs leading-relaxed">
               {diff.map((line, i) => (
                 <div
                   key={i}
@@ -167,10 +176,10 @@ export function ResumesPage() {
                   }
                 >
                   {line.type === "added" ? "+ " : line.type === "removed" ? "− " : "  "}
-                  {line.text || " "}
+                  {line.text || " "}
                 </div>
               ))}
-            </div>
+            </Card>
           )}
         </section>
       )}
@@ -188,21 +197,13 @@ function ResumeRow({
   onDelete: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule-soft py-3.5 last:border-b-0">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold">v{version.version}</span>
           <span className="truncate text-sm text-ink-70">{version.file_name}</span>
-          {version.is_primary && (
-            <span className="shrink-0 rounded-full bg-live-wash px-2 py-0.5 text-xs font-medium text-live">
-              Primary
-            </span>
-          )}
-          {version.track_name && (
-            <span className="shrink-0 rounded-full border border-rule px-2 py-0.5 text-xs text-ink-70">
-              {version.track_name}
-            </span>
-          )}
+          {version.is_primary && <Badge tone="live">Primary</Badge>}
+          {version.track_name && <Badge tone="neutral">{version.track_name}</Badge>}
         </div>
         <p className="mt-0.5 text-xs text-ink-45">
           Uploaded {new Date(version.created_at).toLocaleDateString()}
@@ -245,9 +246,9 @@ function ResumeRow({
         <button
           type="button"
           onClick={onDelete}
-          className="text-xs text-ink-45 hover:text-ghost"
+          className="flex items-center gap-1 text-xs text-ink-45 hover:text-ghost"
         >
-          Delete
+          <Trash2 size={12} /> Delete
         </button>
       </div>
     </div>

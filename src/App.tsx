@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { OnboardingGate } from "@/components/layout/OnboardingGate";
 import { AppShell } from "@/components/layout/AppShell";
 import { RouteErrorBoundary } from "@/components/layout/RouteErrorBoundary";
+import { TooltipProvider } from "@/components/ui/Tooltip";
 
 // Route-level code splitting: signing in shouldn't pay for the
 // matches virtualizer, and browsing matches shouldn't pay for the
@@ -74,6 +75,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+       <TooltipProvider>
         <BrowserRouter>
           <RouteErrorBoundary>
             <Suspense fallback={<RouteFallback />}>
@@ -113,6 +115,7 @@ export default function App() {
             </Suspense>
           </RouteErrorBoundary>
         </BrowserRouter>
+       </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -18,8 +18,17 @@ import { supabase } from "@/lib/supabase";
  * `sample_size` and `total_active_in_currency` are not decoration —
  * every consumer of `min_salary`/`max_salary`/`avg_salary`/
  * `median_salary` must show them next to the numbers. This view
- * deliberately does not attempt cross-currency conversion or infer
- * bands for undisclosed roles; see 0012's header comment for why.
+ * deliberately does not infer bands for undisclosed roles; see
+ * 0012's header comment for why.
+ *
+ * `_usd` columns (migration 0033) are a nominal exchange-rate
+ * conversion via `fx_rates` (synced from the free, keyless
+ * Frankfurter API), not purchasing-power parity — 0012's own
+ * purchasing-power caveat still stands. They're null whenever no
+ * matching `fx_rates` row exists (Frankfurter only covers ~29 major
+ * currencies), never a guessed figure. `fx_as_of` is the date that
+ * rate was published — show it next to any `_usd` figure so the
+ * conversion's provenance is never silently implied.
  */
 export interface SalaryMarketSummaryRow {
   salary_currency: string;
@@ -29,6 +38,12 @@ export interface SalaryMarketSummaryRow {
   max_salary: number | null;
   avg_salary: number | null;
   median_salary: number | null;
+  min_salary_usd: number | null;
+  max_salary_usd: number | null;
+  avg_salary_usd: number | null;
+  median_salary_usd: number | null;
+  fx_rate_per_usd: number | null;
+  fx_as_of: string | null;
 }
 
 /** One row per (company, currency), for a company detail page to show what that employer specifically pays. */
@@ -39,13 +54,16 @@ export interface CompanySalaryBandRow {
   min_salary: number;
   max_salary: number;
   avg_salary: number;
+  avg_salary_usd: number | null;
+  fx_rate_per_usd: number | null;
+  fx_as_of: string | null;
 }
 
 const SALARY_MARKET_SUMMARY_SELECT =
-  "salary_currency, sample_size, total_active_in_currency, min_salary, max_salary, avg_salary, median_salary";
+  "salary_currency, sample_size, total_active_in_currency, min_salary, max_salary, avg_salary, median_salary, min_salary_usd, max_salary_usd, avg_salary_usd, median_salary_usd, fx_rate_per_usd, fx_as_of";
 
 const COMPANY_SALARY_BANDS_SELECT =
-  "company_id, salary_currency, sample_size, min_salary, max_salary, avg_salary";
+  "company_id, salary_currency, sample_size, min_salary, max_salary, avg_salary, avg_salary_usd, fx_rate_per_usd, fx_as_of";
 
 /** Every currency with at least one disclosed active posting, most-sampled first. */
 export function useSalaryMarketSummary() {

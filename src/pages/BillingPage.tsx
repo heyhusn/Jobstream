@@ -1,9 +1,14 @@
 import { useState } from "react";
+import { Copy } from "lucide-react";
 import { useCreditBalance } from "@/hooks/useCreditBalance";
 import { useCreditUsage } from "@/hooks/useAnalytics";
 import { useReferralCode, useMyReferrals } from "@/hooks/useReferrals";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Stat } from "@/components/ui/Stat";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const compactNumber = new Intl.NumberFormat("en-US", { notation: "compact" });
 
@@ -31,35 +36,31 @@ export function BillingPage() {
         today rather than a checkout flow that doesn't exist.
       </p>
 
-      <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
-        {balancePending && <div className="h-16 animate-pulse rounded-app bg-paper" aria-hidden="true" />}
+      <Card className="mt-6">
+        {balancePending && <Skeleton className="h-16" />}
         {balanceError && <ErrorState onRetry={() => refetchBalance()} />}
         {balance && (
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-medium text-ink-45">Current plan</p>
-              <p className="mt-0.5 text-lg font-semibold capitalize">{balance.tier}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-ink-45">Credits remaining</p>
-              <p className="tabular mt-0.5 text-lg font-semibold">{balance.credits_remaining}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-ink-45">Resets</p>
-              <p className="mt-0.5 text-sm text-ink-70">
-                {new Date(balance.credits_reset_at).toLocaleDateString()}
-              </p>
-            </div>
+            <Stat label="Current plan" value={<span className="capitalize">{balance.tier}</span>} />
+            <Stat label="Credits remaining" value={balance.credits_remaining} />
+            <Stat
+              label="Resets"
+              value={
+                <span className="text-sm">
+                  {new Date(balance.credits_reset_at).toLocaleDateString()}
+                </span>
+              }
+            />
           </div>
         )}
-      </section>
+      </Card>
 
       <section className="mt-6">
         <h2 className="mb-3 text-sm font-semibold">Usage by feature</h2>
         {usagePending && (
           <div className="space-y-2" aria-hidden="true">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-12 animate-pulse rounded-app bg-raised" />
+              <Skeleton key={i} className="h-12" />
             ))}
           </div>
         )}
@@ -71,9 +72,9 @@ export function BillingPage() {
           />
         )}
         {usage && usage.length > 0 && (
-          <div className="divide-y divide-rule-soft rounded-app border border-rule bg-raised px-4">
+          <Card padding="none" className="px-4">
             {usage.map((row) => (
-              <div key={row.feature} className="flex items-center justify-between gap-4 py-3">
+              <div key={row.feature} className="flex items-center justify-between gap-4 border-b border-rule-soft py-3 last:border-b-0">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium capitalize">
                     {row.feature.replace(/_/g, " ")}
@@ -89,7 +90,7 @@ export function BillingPage() {
                 </span>
               </div>
             ))}
-          </div>
+          </Card>
         )}
       </section>
 
@@ -124,7 +125,7 @@ function ReferralSection() {
   }
 
   return (
-    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+    <Card className="mt-6">
       <h2 className="text-sm font-semibold">Refer a friend</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
         Share your link — once someone signs up through it and finishes onboarding, you get bonus
@@ -135,13 +136,10 @@ function ReferralSection() {
           <code className="flex-1 truncate rounded-app border border-rule bg-paper px-3 py-2 text-xs">
             {link}
           </code>
-          <button
-            type="button"
-            onClick={copyLink}
-            className="rounded-app border-[1.5px] border-ink px-3 py-1.5 text-sm font-semibold hover:bg-ink hover:text-paper"
-          >
+          <Button variant="ghost" onClick={copyLink}>
+            <Copy size={14} />
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
       )}
       {referrals && referrals.length > 0 && (
@@ -150,6 +148,6 @@ function ReferralSection() {
           {rewardedCount} rewarded so far.
         </p>
       )}
-    </section>
+    </Card>
   );
 }

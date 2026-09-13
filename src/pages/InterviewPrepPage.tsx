@@ -10,6 +10,10 @@ import {
 } from "@/hooks/useInterviewPrep";
 import { TaskState } from "@/components/ui/TaskState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { Card } from "@/components/ui/Card";
+import { Field, fieldInputClass } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const MODE_LABEL: Record<string, string> = { behavioral: "Behavioural", technical: "Technical" };
 
@@ -49,7 +53,7 @@ export function InterviewPrepPage() {
   if (isPending) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <div className="h-40 animate-pulse rounded-app bg-raised" />
+        <Skeleton className="h-40" />
       </div>
     );
   }
@@ -89,7 +93,7 @@ export function InterviewPrepPage() {
 
       <div className="space-y-4">
         {session.turns.map((turn, i) => (
-          <div key={i} className="rounded-app border border-rule bg-raised px-4 py-3">
+          <Card key={i}>
             <p className="text-xs font-medium text-ink-70">Question {i + 1}</p>
             <p className="mt-1 text-sm font-medium leading-relaxed">{turn.question}</p>
 
@@ -115,11 +119,11 @@ export function InterviewPrepPage() {
                 <p className="mt-1 text-sm leading-relaxed text-ink-70">{turn.feedback}</p>
               </div>
             )}
-          </div>
+          </Card>
         ))}
 
         {session.status === "active" && currentQuestion && !currentQuestion.answer && (
-          <div className="rounded-app border border-dashed border-rule bg-raised px-4 py-4">
+          <Card className="border-dashed">
             {busy ? (
               <TaskState
                 phase={task.phase}
@@ -133,33 +137,25 @@ export function InterviewPrepPage() {
                     <TaskState phase="failed" errorMessage={task.error} onRetry={submit} />
                   </div>
                 )}
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-ink-70">
-                    Your answer
-                  </span>
+                <Field label="Your answer">
                   <textarea
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
                     rows={6}
                     placeholder="Answer as you would out loud — specific, not polished."
-                    className="w-full resize-y rounded-app border border-rule bg-paper px-3 py-2 text-sm leading-relaxed transition-colors focus:border-ink"
+                    className={fieldInputClass + " resize-y leading-relaxed"}
                   />
-                </label>
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={!answer.trim()}
-                  className="mt-3 rounded-app border-[1.5px] border-ink bg-ink px-3.5 py-2 text-sm font-semibold text-paper transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                </Field>
+                <Button onClick={submit} disabled={!answer.trim()} className="mt-3">
                   Submit answer
-                </button>
+                </Button>
               </>
             )}
-          </div>
+          </Card>
         )}
 
         {session.status === "completed" && session.summary && (
-          <div className="rounded-app border border-rule bg-raised px-4 py-4">
+          <Card>
             <h2 className="text-sm font-semibold">Session summary</h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-70">
               {session.summary.overall_feedback}
@@ -193,7 +189,7 @@ export function InterviewPrepPage() {
             >
               Back to tracker
             </Link>
-          </div>
+          </Card>
         )}
       </div>
     </div>

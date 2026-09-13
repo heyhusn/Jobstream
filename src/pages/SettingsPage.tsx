@@ -13,6 +13,10 @@ import {
 } from "@/hooks/useNegativeKeywords";
 import { useCoverLetterBlocks, useDeleteCoverLetterBlock } from "@/hooks/useCoverLetterBlocks";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Field, fieldInputClass } from "@/components/ui/Field";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 /**
  * Data rights (roadmap M25 / minor m38): export everything this app
@@ -47,7 +51,7 @@ export function SettingsPage() {
 
       <CoverLetterBlocksSection />
 
-      <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
+      <Card className="mt-8">
         <h2 className="text-sm font-semibold">Export your data</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
           Downloads everything this app holds about you — profile, resumes, applications,
@@ -66,9 +70,9 @@ export function SettingsPage() {
             Couldn't export your data. Try again.
           </p>
         )}
-      </section>
+      </Card>
 
-      <section className="mt-6 rounded-app border border-ghost/40 bg-ghost-wash px-5 py-4">
+      <div className="mt-6 rounded-app border border-ghost/40 bg-ghost-wash px-5 py-4">
         <h2 className="text-sm font-semibold text-ghost">Delete your account</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
           Permanently deletes your account and everything tied to it — resumes, applications,
@@ -127,7 +131,7 @@ export function SettingsPage() {
             )}
           </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
@@ -192,13 +196,11 @@ function ProfileSection() {
   }
 
   if (isPending) {
-    return (
-      <div className="mt-8 h-64 animate-pulse rounded-app bg-raised" aria-hidden="true" />
-    );
+    return <Skeleton className="mt-8 h-64" />;
   }
 
   return (
-    <section className="mt-8 rounded-app border border-rule bg-raised px-5 py-4">
+    <Card className="mt-8">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold">Profile</h2>
         <span className="tabular text-xs font-medium text-ink-70">{percent}% complete</span>
@@ -222,99 +224,91 @@ function ProfileSection() {
       )}
 
       <div className="mt-4 space-y-3.5">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-ink-70">Skills</label>
+        <Field label="Skills">
           <textarea
             rows={2}
             value={skillsText}
             onChange={(e) => setSkillsText(e.target.value)}
-            className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            className={fieldInputClass}
             placeholder="python, fastapi, postgresql…"
           />
-        </div>
+        </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">Years of experience</label>
+          <Field label="Years of experience">
             <input
               type="number"
               min={0}
               max={50}
               value={years}
               onChange={(e) => setYears(e.target.value)}
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">Work arrangement</label>
+          </Field>
+          <Field label="Work arrangement">
             <select
               value={remotePreference}
               onChange={(e) => setRemotePreference(e.target.value as typeof remotePreference)}
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             >
               <option value="no_preference">No strong preference</option>
               <option value="remote">Remote</option>
               <option value="hybrid">Hybrid</option>
               <option value="onsite">Onsite</option>
             </select>
-          </div>
+          </Field>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">Salary floor</label>
+          <Field label="Salary floor">
             <input
               type="number"
               min={0}
               value={salaryFloor}
               onChange={(e) => setSalaryFloor(e.target.value)}
               placeholder="e.g. 90000"
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">Currency</label>
+          </Field>
+          <Field label="Currency">
             <input
               type="text"
               value={salaryCurrency}
               onChange={(e) => setSalaryCurrency(e.target.value.toUpperCase().slice(0, 3))}
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             />
-          </div>
+          </Field>
         </div>
 
-        <div>
-          <label className="mb-1 block text-xs font-medium text-ink-70">Work authorisation</label>
+        <Field label="Work authorisation">
           <input
             type="text"
             value={workAuth}
             onChange={(e) => setWorkAuth(e.target.value)}
             placeholder="e.g. US citizen, needs sponsorship, EU work permit…"
-            className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            className={fieldInputClass}
           />
-        </div>
+        </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">GitHub</label>
+          <Field label="GitHub">
             <input
               type="url"
               value={githubUrl}
               onChange={(e) => setGithubUrl(e.target.value)}
               placeholder="https://github.com/you"
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-ink-70">Portfolio</label>
+          </Field>
+          <Field label="Portfolio">
             <input
               type="url"
               value={portfolioUrl}
               onChange={(e) => setPortfolioUrl(e.target.value)}
               placeholder="https://you.dev"
-              className="w-full rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+              className={fieldInputClass}
             />
-          </div>
+          </Field>
         </div>
       </div>
 
@@ -325,7 +319,7 @@ function ProfileSection() {
         {saved && <span className="text-xs text-live">Saved.</span>}
         {update.isError && <span className="text-xs text-ghost">Couldn't save. Try again.</span>}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -352,7 +346,7 @@ function SearchFiltersSection() {
   }
 
   return (
-    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+    <Card className="mt-6">
       <h2 className="text-sm font-semibold">Search filters</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
         Companies and keywords hidden from Matches and Search — applied automatically, no need to
@@ -401,7 +395,7 @@ function SearchFiltersSection() {
               }
             }}
             placeholder="e.g. clearance required"
-            className="flex-1 rounded-app border border-rule bg-paper px-3 py-2 text-sm outline-none focus:border-ink"
+            className={fieldInputClass + " flex-1"}
           />
           <button
             type="button"
@@ -415,10 +409,7 @@ function SearchFiltersSection() {
         {keywords && keywords.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {keywords.map((k) => (
-              <span
-                key={k.id}
-                className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-paper py-1 pl-2.5 pr-1.5 text-xs text-ink-70"
-              >
+              <Badge key={k.id} tone="neutral" className="rounded-full py-1 pl-2.5 pr-1.5">
                 {k.keyword}
                 <button
                   type="button"
@@ -427,12 +418,12 @@ function SearchFiltersSection() {
                 >
                   ×
                 </button>
-              </span>
+              </Badge>
             ))}
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -448,7 +439,7 @@ function CoverLetterBlocksSection() {
   if (!blocks || blocks.length === 0) return null;
 
   return (
-    <section className="mt-6 rounded-app border border-rule bg-raised px-5 py-4">
+    <Card className="mt-6">
       <h2 className="text-sm font-semibold">Cover letter blocks</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
         Saved from the cover letter editor — insert any of these into a future draft.
@@ -470,6 +461,6 @@ function CoverLetterBlocksSection() {
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }
