@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "JobSpy — Save Any Job",
+  "version": "0.1.0",
+  "description": "Capture the job posting you're viewing, on any site, straight into your JobSpy tracker.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save this job to JobSpy"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "storage", "scripting", "contextMenus"],
+  "minimum_chrome_version": "110"
+}

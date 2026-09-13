@@ -17,7 +17,8 @@ export type TaskType =
   | "resume_optimize"
   | "interview_turn"
   | "assisted_apply"
-  | "agent_run";
+  | "agent_run"
+  | "tailor_resume";
 export type RemoteType = "remote" | "hybrid" | "onsite";
 export type RiskBand = "low" | "medium" | "high";
 export type VisaSponsorship = "offered" | "not_offered";

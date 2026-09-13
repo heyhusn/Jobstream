@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Field, fieldInputClass } from "@/components/ui/Field";
 import { CoverLetterPanel } from "./CoverLetterPanel";
 import { ResumeOptimizerPanel } from "./ResumeOptimizerPanel";
+import { ResumeTailorPanel } from "./ResumeTailorPanel";
 import { AssistedApplyPanel } from "./AssistedApplyPanel";
 import { InterviewPrepPanel } from "./InterviewPrepPanel";
 import { AgentOrchestrationPanel } from "./AgentOrchestrationPanel";
@@ -288,6 +289,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
           <InterviewSchedulePanel item={item} onPatch={patch} />
           <FollowUpEmailPanel item={item} />
           <ResumeOptimizerPanel item={item} />
+          <ResumeTailorPanel item={item} />
           <AssistedApplyPanel item={item} />
           <AgentOrchestrationPanel item={item} />
           <InterviewPrepPanel item={item} />

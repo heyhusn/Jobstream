@@ -74,6 +74,10 @@ import {
   parseAnswerEval,
   UnusableResponse as InterviewUnusable,
 } from "../supabase/functions/interview-prep/prompt.ts";
+import {
+  parseTailorResult,
+  UnusableResponse as TailorUnusable,
+} from "../supabase/functions/tailor-resume/prompt.ts";
 
 // ── tiny pass/fail runner ──────────────────────────────────────────
 // No test framework, per this repo's own conventions — just a
@@ -459,6 +463,72 @@ function checkInterviewPrep() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// tailor-resume — every `not_addressed` requirement must never leak
+// into a `tailored` bullet's text (that would be exactly the
+// fabrication this feature exists to refuse); garbled input handled
+// the same way optimize-resume's parser handles it.
+// ─────────────────────────────────────────────────────────────────
+
+function checkTailorResume() {
+  const WELL_FORMED = JSON.stringify({
+    rewrites: [
+      {
+        original: "Built backend services in Python for 3 years at Acme.",
+        tailored: "Built and shipped Python backend services in production for 3 years at Acme.",
+        rationale: "Mirrors the posting's own phrase 'production Python services'.",
+      },
+    ],
+    not_addressed: ["Kubernetes"],
+  });
+
+  const result = parseTailorResult(WELL_FORMED);
+  check(
+    "well-formed fixture: rewrite parsed correctly",
+    result.rewrites.length === 1 &&
+      result.rewrites[0].original.includes("Acme") &&
+      result.rewrites[0].tailored.includes("production")
+  );
+  check(
+    "well-formed fixture: not_addressed parsed correctly",
+    result.notAddressed.length === 1 && result.notAddressed[0] === "Kubernetes"
+  );
+
+  // The load-bearing regression guard: a `not_addressed` item must
+  // never simultaneously appear folded into a `tailored` bullet —
+  // that would mean the model both admitted it couldn't support a
+  // requirement AND fabricated a bullet claiming it anyway.
+  const overlap = result.notAddressed.some((n) =>
+    result.rewrites.some((r) => r.tailored.toLowerCase().includes(n.toLowerCase()))
+  );
+  check("not_addressed items never leak into a tailored bullet", !overlap);
+
+  // Prose-wrapped JSON (a stray sentence + markdown fence) must be
+  // salvaged, same as optimize-resume's salvage() helper.
+  const WRAPPED = `Here you go:\n\`\`\`json\n${WELL_FORMED}\n\`\`\``;
+  let salvaged;
+  try {
+    salvaged = parseTailorResult(WRAPPED);
+  } catch {
+    salvaged = undefined;
+  }
+  check("prose-wrapped JSON is salvaged, not rejected", salvaged !== undefined && salvaged.rewrites.length === 1);
+
+  // Garbled: not JSON at all.
+  expectThrows(
+    "non-JSON response is rejected as retryable",
+    () => parseTailorResult("I can't help rewrite that, sorry."),
+    (e) => e instanceof TailorUnusable && e.retryable === true
+  );
+
+  // Well-formed JSON, but structurally empty — nothing usable.
+  expectThrows(
+    "empty rewrites+not_addressed is refused as nothing usable",
+    () => parseTailorResult(JSON.stringify({ rewrites: [], not_addressed: [] })),
+    (e) => e instanceof TailorUnusable
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
 // live mode — opt-in only, real tasks rows, real credits, real
 // DeepSeek cost. Never imported/executed unless --live is passed.
 // ─────────────────────────────────────────────────────────────────
@@ -604,6 +674,7 @@ async function main() {
   runSection("generate-cover-letter/prompt.ts", checkCoverLetter);
   runSection("analyze-skill-gap/prompt.ts", checkSkillGap);
   runSection("interview-prep/prompt.ts", checkInterviewPrep);
+  runSection("tailor-resume/prompt.ts", checkTailorResume);
 
   console.log(`\n${"─".repeat(70)}`);
   console.log(`Dry-run: ${total - failed}/${total} checks passed.`);
