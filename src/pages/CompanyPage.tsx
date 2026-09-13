@@ -12,6 +12,7 @@ import {
   useAddCompanyContact,
   useDeleteCompanyContact,
 } from "@/hooks/useCompanyContacts";
+import { useAsyncTask } from "@/hooks/useAsyncTask";
 import { useInterviewQuestionsForCompany } from "@/hooks/useAnalytics";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -357,22 +358,49 @@ function CompanyContactsSection({ companyId }: { companyId: string | undefined }
         <ul className="mt-4 space-y-2.5 border-t border-rule-soft pt-3">
           {contacts.map((c) => (
             <li key={c.id} className="flex items-start justify-between gap-3 text-sm">
-              <div>
+              <div className="flex-1">
                 {c.contact_name && <p className="font-medium">{c.contact_name}</p>}
                 <p className="text-ink-70">{c.note}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => deleteContact.mutate(c.id)}
-                className="shrink-0 text-xs text-ink-45 hover:text-ghost"
-              >
-                Delete
-              </button>
+              <div className="flex items-center gap-3">
+                <DraftOutreachButton companyId={companyId} contactName={c.contact_name} note={c.note} />
+                <button
+                  type="button"
+                  onClick={() => deleteContact.mutate(c.id)}
+                  className="shrink-0 text-xs text-ink-45 hover:text-ghost"
+                >
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+function DraftOutreachButton({ companyId, contactName, note }: { companyId?: string; contactName?: string | null; note?: string | null }) {
+  const { state, run } = useAsyncTask<any, { subject: string; body: string }>("draft_outreach");
+  
+  if (state.phase === "done") {
+    return (
+      <div className="max-w-[400px] rounded-app bg-raised p-3 text-xs">
+        <p className="mb-2 font-medium">Subject: {state.result.subject}</p>
+        <p className="whitespace-pre-wrap text-ink-70">{state.result.body}</p>
+      </div>
+    );
+  }
+  
+  return (
+    <button
+      type="button"
+      onClick={() => run({ company_id: companyId, notes: `Recipient: ${contactName || 'recruiter'}. Context: ${note || ''}` })}
+      disabled={state.phase === "queued" || state.phase === "running"}
+      className="shrink-0 rounded-app border border-rule px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-rule-soft disabled:opacity-50"
+    >
+      {state.phase === "queued" || state.phase === "running" ? "Drafting..." : "Draft Email"}
+    </button>
   );
 }
 

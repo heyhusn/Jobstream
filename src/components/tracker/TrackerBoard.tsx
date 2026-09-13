@@ -263,8 +263,8 @@ export function TrackerBoard({ applications, scores }: Props) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="-mx-6 overflow-x-auto px-6 pb-4">
-          <div className="flex min-h-[420px] items-stretch gap-3">
+        <div className="-mx-6 px-6 pb-4 md:overflow-x-auto">
+          <div className="flex min-h-[420px] flex-col md:flex-row items-stretch gap-3">
             {effectiveStages
               .filter((s) => !s.hidden)
               .map((s) => (

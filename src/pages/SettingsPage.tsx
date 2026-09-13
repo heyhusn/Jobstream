@@ -12,6 +12,7 @@ import {
   useRemoveNegativeKeyword,
 } from "@/hooks/useNegativeKeywords";
 import { useCoverLetterBlocks, useDeleteCoverLetterBlock } from "@/hooks/useCoverLetterBlocks";
+import { useCollaborators, useInviteCollaborator, useRemoveCollaborator, usePendingInvites, useAcceptInvite } from "@/hooks/useTeamCollaboration";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -50,6 +51,10 @@ export function SettingsPage() {
       <SearchFiltersSection />
 
       <CoverLetterBlocksSection />
+
+      <TeamCollaborationSection />
+      
+      <PendingInvitesSection />
 
       <Card className="mt-8">
         <h2 className="text-sm font-semibold">Export your data</h2>
@@ -457,6 +462,109 @@ function CoverLetterBlocksSection() {
               className="shrink-0 text-xs text-ink-45 hover:text-ghost"
             >
               Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+export function TeamCollaborationSection() {
+  const { data: collaborators } = useCollaborators();
+  const invite = useInviteCollaborator();
+  const remove = useRemoveCollaborator();
+  const [emailInput, setEmailInput] = useState("");
+
+  function handleInvite() {
+    const email = emailInput.trim();
+    if (!email) return;
+    invite.mutate(email, { onSuccess: () => setEmailInput("") });
+  }
+
+  return (
+    <Card className="mt-6">
+      <h2 className="text-sm font-semibold">Team & Advisors</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
+        Invite coaches, friends, or recruiters to view your tracker board, resumes, and applications.
+      </p>
+
+      <div className="mt-4 flex gap-2">
+        <input
+          type="email"
+          value={emailInput}
+          onChange={(e) => setEmailInput(e.target.value)}
+          placeholder="coach@example.com"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleInvite();
+            }
+          }}
+          className={fieldInputClass + " flex-1"}
+        />
+        <button
+          type="button"
+          onClick={handleInvite}
+          disabled={invite.isPending || !emailInput.trim()}
+          className="rounded-app border border-ink px-3 py-1.5 text-sm font-medium hover:bg-ink hover:text-paper disabled:opacity-50"
+        >
+          Invite
+        </button>
+      </div>
+
+      {collaborators && collaborators.length > 0 && (
+        <ul className="mt-4 space-y-2.5 border-t border-rule-soft pt-3">
+          {collaborators.map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
+              <div>
+                <span className="font-medium">{c.collaborator_email}</span>
+                <span className="ml-2 text-xs text-ink-70">
+                  ({c.status})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => remove.mutate(c.id)}
+                className="text-xs text-ink-45 hover:text-ghost"
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+export function PendingInvitesSection() {
+  const { data: invites } = usePendingInvites();
+  const accept = useAcceptInvite();
+
+  if (!invites || invites.length === 0) return null;
+
+  return (
+    <Card className="mt-6 border-live/30 bg-live/5">
+      <h2 className="text-sm font-semibold text-live">Pending Invites</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-70">
+        You have been invited to collaborate on these accounts. Accepting will give you read-only access to their applications, matches, and resumes.
+      </p>
+
+      <ul className="mt-4 space-y-2.5 border-t border-live/20 pt-3">
+        {invites.map((invite) => (
+          <li key={invite.id} className="flex items-center justify-between gap-3 text-sm">
+            <div>
+              <span className="font-medium text-live">Invite from User ID:</span>
+              <span className="ml-2 text-ink-70">{invite.owner_id}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => accept.mutate(invite.id)}
+              disabled={accept.isPending}
+              className="rounded-app border-[1.5px] border-live bg-live px-3 py-1 text-xs font-semibold text-paper transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {accept.isPending ? "Accepting…" : "Accept"}
             </button>
           </li>
         ))}

@@ -70,6 +70,11 @@ const DEFAULT_BOARDS: Array<{
   { ats_type: 'greenhouse', token: 'figma', canonical_name: 'Figma', domain: 'figma.com', size_band: '1001-5000', hq_country: 'US', max_jobs: 10 },
   { ats_type: 'greenhouse', token: 'asana', canonical_name: 'Asana', domain: 'asana.com', size_band: '1001-5000', hq_country: 'US', max_jobs: 10 },
   { ats_type: 'greenhouse', token: 'brex', canonical_name: 'Brex', domain: 'brex.com', size_band: '501-1000', hq_country: 'US', max_jobs: 10 },
+  { ats_type: 'greenhouse', token: 'airbnb', canonical_name: 'Airbnb', domain: 'airbnb.com', size_band: '5001-10000', hq_country: 'US', max_jobs: 10 },
+  { ats_type: 'greenhouse', token: 'stripe', canonical_name: 'Stripe', domain: 'stripe.com', size_band: '5001-10000', hq_country: 'US', max_jobs: 10 },
+  { ats_type: 'greenhouse', token: 'robinhood', canonical_name: 'Robinhood', domain: 'robinhood.com', size_band: '1001-5000', hq_country: 'US', max_jobs: 10 },
+  { ats_type: 'greenhouse', token: 'discord', canonical_name: 'Discord', domain: 'discord.com', size_band: '501-1000', hq_country: 'US', max_jobs: 10 },
+  { ats_type: 'greenhouse', token: 'reddit', canonical_name: 'Reddit', domain: 'reddit.com', size_band: '1001-5000', hq_country: 'US', max_jobs: 10 },
   // Lever — https://api.lever.co/v0/postings/{token}?mode=json, verified live 2026-09-13.
   { ats_type: 'lever', token: 'ro', canonical_name: 'Ro', domain: 'ro.co', size_band: '201-500', hq_country: 'US', max_jobs: 10 },
   { ats_type: 'lever', token: 'ledger', canonical_name: 'Ledger', domain: 'ledger.com', size_band: '501-1000', hq_country: 'FR', max_jobs: 10 },

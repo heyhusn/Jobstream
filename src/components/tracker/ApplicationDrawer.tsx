@@ -169,7 +169,7 @@ export function ApplicationDrawer({ item, score, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex h-full w-full max-w-[560px] flex-col overflow-y-auto border-l border-rule bg-paper shadow-2xl"
+        className="relative flex h-full w-full md:max-w-[720px] flex-col overflow-y-auto border-l border-rule bg-paper shadow-2xl"
       >
         <header className="sticky top-0 z-10 border-b border-rule bg-paper/95 px-5 py-4 backdrop-blur-sm">
           <div className="flex items-start gap-3">

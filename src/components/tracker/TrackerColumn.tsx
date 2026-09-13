@@ -37,7 +37,7 @@ export function TrackerColumn({
 
   return (
     <section
-      className="flex w-[272px] shrink-0 flex-col"
+      className="flex w-full md:w-[272px] shrink-0 flex-col"
       aria-label={`${label}, ${items.length} ${items.length === 1 ? "application" : "applications"}`}
     >
       <header className="mb-2 flex items-center gap-2 px-1">

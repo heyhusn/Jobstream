@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { fieldInputClass } from "@/components/ui/Field";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { ResumeBuilder } from "@/components/ResumeBuilder";
 
 /**
  * Minors m01 (version manager + diff), m02 (per-track resume sets),
@@ -65,6 +66,10 @@ export function ResumesPage() {
           Whichever one is marked primary is what cover letters, interview prep, and the resume
           optimiser read from.
         </p>
+      </div>
+
+      <div className="mb-6">
+        <ResumeBuilder />
       </div>
 
       <Card className="mb-6 border-dashed">

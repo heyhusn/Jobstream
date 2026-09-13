@@ -91,6 +91,7 @@ as $$
 declare
   v_alert       record;
   v_new_count   int;
+  v_any_fired   boolean := false;
   v_checked_at  timestamptz := now();
 begin
   for v_alert in select * from public.job_alerts loop
@@ -133,10 +134,15 @@ begin
         'Open your alert "' || v_alert.name || '" to see the new matches.',
         '/alerts'
       );
+      v_any_fired := true;
     end if;
 
     update public.job_alerts set last_checked_at = v_checked_at where id = v_alert.id;
   end loop;
+
+  if v_any_fired then
+    perform private.dispatch_scheduled_function('send-notification');
+  end if;
 
   return (select count(*) from public.job_alerts);
 end;
